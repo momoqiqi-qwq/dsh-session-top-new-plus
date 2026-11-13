@@ -1,0 +1,324 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+// Small DOM fixture for lifecycle and mutation-cost checks; no browser dependencies.
+class Element {
+	constructor(tag) {
+		this.tagName = tag;
+		this.children = [];
+		this.parentElement = null;
+		this.attrs = {};
+		this.dataset = {};
+		this.style = {};
+		this.listeners = new Map();
+		this.className = "";
+		this._text = "";
+		this.scrollTop = 0;
+		this.hidden = false;
+		this.lookups = 0;
+		this.width = 280;
+		this.classList = { toggle: (name, on) => {
+			const names = new Set(this.className.split(" ").filter(Boolean));
+			if (on) names.add(name); else names.delete(name);
+			this.className = [...names].join(" ");
+		} };
+	}
+	get textContent() { return this._text + this.children.map((x) => x.textContent).join(""); }
+	set textContent(value) { this._text = String(value); this.children = []; }
+	get isConnected() { return this === document || Boolean(this.parentElement?.isConnected); }
+	get clientWidth() { layoutReads++; return this.width; }
+	getBoundingClientRect() { layoutReads++; return { left: 150, top: buttonTop, bottom: buttonTop + 28 }; }
+	setAttribute(key, value) { this.attrs[key] = String(value); if (key === "id") this.id = value; }
+	contains(node) { return node === this || this.children.some((child) => child.contains(node)); }
+	append(...nodes) {
+		for (const node of nodes) {
+			if (node.tagName === "fragment") { this.append(...[...node.children]); continue; }
+			node.remove(); node.parentElement = this; this.children.push(node);
+		}
+	}
+	insertBefore(node, next) {
+		node.remove();
+		node.parentElement = this;
+		this.children.splice(this.children.indexOf(next), 0, node);
+	}
+	remove() {
+		if (this.parentElement) this.parentElement.children.splice(this.parentElement.children.indexOf(this), 1);
+		this.parentElement = null;
+	}
+	replaceChildren(...nodes) { for (const child of [...this.children]) child.remove(); this.append(...nodes); }
+	addEventListener(name, fn) { if (!this.listeners.has(name)) this.listeners.set(name, new Set()); this.listeners.get(name).add(fn); }
+	removeEventListener(name, fn) { this.listeners.get(name)?.delete(fn); }
+	dispatchEvent(event) { for (const fn of [...(this.listeners.get(event.type) || [])]) fn(event); }
+	focus() { document.activeElement = this; }
+	querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+	querySelectorAll(selector) {
+		this.lookups++;
+		const result = [];
+		const walk = (node) => { for (const child of node.children) { if (child.matches(selector)) result.push(child); walk(child); } };
+		walk(this);
+		return result;
+	}
+	matches(selector) {
+		return selector.split(",").some((part) => {
+			part = part.trim();
+			if (part.startsWith(".")) return this.className.split(" ").includes(part.slice(1));
+			if (part.startsWith("[class*=")) return this.className.toLowerCase().includes(/="([^"]+)"/.exec(part)[1].toLowerCase());
+			if (part.startsWith("[data-")) {
+				const match = /^\[data-([\w-]+)(?:="([^"]+)")?\]$/.exec(part);
+				return Boolean(match && (match[2] ? this.attrs["data-" + match[1]] === match[2] : this.dataset[match[1]] !== undefined));
+			}
+			if (part.includes("aria-label*=")) {
+				const term = /="([^"]+)"/.exec(part)[1];
+				return (this.attrs["aria-label"] || "").toLowerCase().includes(term.toLowerCase());
+			}
+			return this.tagName === part;
+		});
+	}
+	closest(selector) { return this.matches(selector) ? this : this.parentElement?.closest(selector) || null; }
+}
+
+const document = new Element("document");
+document.head = new Element("head");
+document.body = new Element("body");
+document.documentElement = new Element("html");
+document.append(document.documentElement);
+document.documentElement.append(document.head, document.body);
+document.createElement = (tag) => new Element(tag);
+document.createElementNS = (ns, tag) => Object.assign(new Element(tag), { namespaceURI: ns });
+document.createDocumentFragment = () => new Element("fragment");
+document.getElementById = (id) => {
+	const walk = (el) => el.id === id ? el : el.children.map(walk).find(Boolean);
+	return walk(document);
+};
+let layoutReads = 0;
+let buttonTop = 80;
+const window = Object.assign(new Element("window"), { innerWidth: 1200, innerHeight: 800 });
+const frames = new Map();
+let frameId = 0;
+const flush = () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach((fn) => fn()); };
+const mutations = [];
+const resizes = [];
+class MutationObserver {
+	constructor(fn) { this.fn = fn; mutations.push(this); }
+	observe(target, config) { this.target = target; this.config = config; }
+	disconnect() { this.disconnected = true; }
+}
+class ResizeObserver {
+	constructor(fn) { this.fn = fn; resizes.push(this); }
+	observe(target) { this.target = target; this.fn(); }
+	disconnect() { this.disconnected = true; }
+}
+const storage = new Map();
+const localStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) };
+let effects = [];
+let layouts = [];
+let refs = [];
+let refIndex = 0;
+let mounted = false;
+let stateWrites = 0;
+const React = {
+	createElement(type, props, ...children) { return { type, props: { ...props, children: children.length === 1 ? children[0] : children } }; },
+	useState() { return [mounted, (value) => { mounted = value; stateWrites++; }]; },
+	useRef() { return refs[refIndex++] ||= { current: null }; },
+	useEffect(fn) { effects.push(fn); },
+	useLayoutEffect(fn) { layouts.push(fn); }
+};
+let api;
+window.__ModuleLoader__ = { load(bundle) { api = bundle.factory(() => React); } };
+const sourceText = fs.readFileSync("lib/client.js", "utf8");
+const code = sourceText.replace("module.exports = { apply, inject };", "module.exports = { apply, inject, createBellSource, mountSidebarBell, BellPanel };");
+vm.runInNewContext(code, {
+	window, document, localStorage, React, MutationObserver, ResizeObserver, console,
+	requestAnimationFrame: (fn) => { frames.set(++frameId, fn); return frameId; },
+	cancelAnimationFrame: (id) => frames.delete(id), setTimeout, clearTimeout,
+	CustomEvent: class { constructor(type) { this.type = type; } }
+});
+
+const sidebar = new Element("aside");
+document.body.append(sidebar);
+function header(title = "工作区") {
+	const row = new Element("div");
+	const label = new Element("span"); label.textContent = title;
+	const searchContainer = new Element("div");
+	const search = new Element("button"); search.setAttribute("aria-label", "Search sessions");
+	searchContainer.append(search);
+	row.append(label, searchContainer, new Element("button"), new Element("button"));
+	return row;
+}
+let row = header(); sidebar.append(row);
+const listeners = new Set();
+let subscriptions = 0;
+let dockState = { items: [
+	{ id: "parent", title: "Parent", updatedAt: Date.now() },
+	{ id: "child", parentId: "parent", title: "Child", running: true, updatedAt: Date.now() },
+	{ id: "unread", title: "Unread", unread: true, updatedAt: Date.now() },
+	{ id: "old", title: "Old", unread: true, updatedAt: Date.now() - 4 * 86400000 },
+	{ id: "blank", title: "Blank", blank: true, updatedAt: Date.now() }
+], current: null };
+const dock = { getSnapshot: () => dockState, subscribe(fn) { subscriptions++; listeners.add(fn); return () => listeners.delete(fn); } };
+const source = api.createBellSource(dock, {});
+assert.equal(subscriptions, 1);
+assert.equal(source.getSnapshot().unreadCount, 1);
+assert.equal(source.getSnapshot().runningCount, 1);
+assert.equal(source.getSnapshot().items.length, 3);
+const initial = source.getSnapshot();
+listeners.forEach((fn) => fn());
+assert.equal(source.getSnapshot(), initial, "unchanged snapshot stays referentially stable");
+const anchor = api.mountSidebarBell(source);
+flush();
+assert.equal(anchor.button.parentElement, row, "button is a direct header child, outside search handlers");
+assert.equal(mutations.length, 1);
+assert.equal(mutations[0].target, sidebar);
+assert.deepEqual({ ...mutations[0].config }, { childList: true, subtree: true });
+const lookups = sidebar.lookups;
+const reads = layoutReads;
+for (let i = 0; i < 500; i++) mutations[0].fn();
+assert.equal(frames.size, 0, "attached button makes mutation callbacks O(1)");
+assert.equal(sidebar.lookups, lookups);
+assert.equal(layoutReads, reads);
+row.remove(); row = header("Workspaces"); sidebar.append(row);
+for (let i = 0; i < 500; i++) mutations[0].fn();
+assert.equal(frames.size, 1, "500 detached-button callbacks coalesce into one frame");
+assert.equal(layoutReads, reads);
+flush();
+assert.equal(sidebar.lookups, lookups + 1);
+assert.equal(anchor.button.parentElement, row);
+assert.equal(layoutReads, reads, "anchor recovery performs no layout read");
+
+const render = () => { refIndex = 0; effects = []; layouts = []; return api.BellPanel({ source, anchor }); };
+assert.equal(render(), null, "panel contents absent before first open");
+const cleanups = effects.map((fn) => fn()).filter(Boolean);
+source.setOpen(true);
+assert.equal(stateWrites, 1);
+const tree = render();
+const root = new Element("div");
+root.className = "dsb-panel";
+const scroll = new Element("div"); scroll.className = "dsb-scroll";
+root.append(scroll); document.body.append(root); refs[0].current = root;
+const disposePanel = layouts[0]();
+assert.equal(root.hidden, false);
+assert.match(scroll.textContent, /运行中 \/ Running.*Parent.*未读 \/ Unread.*Unread/);
+assert.doesNotMatch(scroll.textContent, /Child|Old|Blank/);
+const disclosure = scroll.querySelector("[data-expand]");
+root.dispatchEvent({ type: "click", target: disclosure });
+assert.match(scroll.textContent, /Child/);
+scroll.scrollTop = 77;
+source.setOpen(false);
+assert.equal(root.hidden, true);
+source.setOpen(true);
+assert.equal(root.hidden, false);
+assert.equal(scroll.scrollTop, 77);
+assert.equal(stateWrites, 1, "badge/open changes do not re-render the React panel after first mount");
+assert.equal(source.getSnapshot().open, true);
+document.dispatchEvent({ type: "keydown", key: "Escape" });
+assert.equal(root.hidden, true);
+assert.equal(document.activeElement, anchor.button);
+source.setOpen(true);
+document.dispatchEvent({ type: "pointerdown", target: document.body });
+assert.equal(root.hidden, true);
+buttonTop = 740; source.setOpen(true);
+assert.equal(root.style.top, "auto", "panel flips upward near bottom edge");
+assert.equal(root.style.bottom, "66px");
+sidebar.width = 60; resizes[0].fn();
+assert.match(anchor.button.className, /dsb-rail/);
+assert.equal(source.getSnapshot().open, false);
+sidebar.width = 280; resizes[0].fn();
+assert.doesNotMatch(anchor.button.className, /dsb-rail/);
+dockState = { ...dockState, items: dockState.items.map((it) => ({ ...it, unread: false })) };
+listeners.forEach((fn) => fn());
+assert.doesNotMatch(anchor.button.className, /dsb-unread/);
+assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0");
+assert.equal(stateWrites, 1);
+localStorage.setItem("dsh-session-top-new.days", "7");
+window.dispatchEvent({ type: "dsh-session-top-new:days" });
+assert.equal(source.getSnapshot().items.some((it) => it.id === "old"), true, "bell follows dock day setting");
+dockState = { items: [], current: null };
+listeners.forEach((fn) => fn());
+source.setOpen(true);
+assert.equal(scroll.textContent, "没有进行中的会话 / No running sessions");
+localStorage.removeItem("dsh-session-top-new.days");
+anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
+assert.equal(listeners.size, 0);
+assert.equal(anchor.button.isConnected, false);
+assert.equal(document.getElementById("dsh-session-top-new-bell-styles"), undefined);
+assert.equal(mutations[0].disconnected, true);
+assert.equal(resizes[0].disconnected, true);
+assert.equal(frames.size, 0);
+for (const target of [window, document, root, scroll]) {
+	for (const [name, handlers] of target.listeners) assert.equal(handlers.size, 0, "disposes " + name);
+}
+
+row.remove();
+const workspaceRoot = new Element("div");
+const collapsedHeader = new Element("div"); collapsedHeader.className = "fixture_sectionHeader";
+collapsedHeader.append(new Element("button"));
+const searchRow = new Element("div");
+const railSearch = new Element("button"); railSearch.setAttribute("aria-label", "Search sessions");
+searchRow.append(railSearch);
+workspaceRoot.append(collapsedHeader, searchRow); sidebar.append(workspaceRoot);
+sidebar.width = 60;
+const railSource = api.createBellSource(dock, {});
+const railAnchor = api.mountSidebarBell(railSource);
+flush();
+assert.equal(railAnchor.button.isConnected, false, "collapsed startup must not mistake multi-row workspace root for header");
+workspaceRoot.replaceChildren(header("Workspace"));
+sidebar.width = 280;
+mutations[1].fn(); flush(); resizes[1].fn();
+assert.equal(railAnchor.button.parentElement, workspaceRoot.children[0], "expansion injects into actual header");
+railAnchor.dispose();
+workspaceRoot.remove(); sidebar.append(row);
+
+// Exercise the actual plugin registration and late Cordis service startup.
+const services = {};
+const serviceEvents = new Set();
+const registrations = new Map();
+const effectDisposers = [];
+let listSubscriptions = 0;
+let statusSubscriptions = 0;
+let listUnsubscribed = 0;
+let statusUnsubscribed = 0;
+let statusListener;
+const list = { ids: ["late"], byId: { late: { displayTitle: "Late service", updatedAt: Date.now() } } };
+const ctx = {
+	get: (name) => services[name], reflect: { get: (name) => services[name] },
+	on(name, fn) { assert.ok(name === "connection/reset" || name === "slots/changed", "only declared client events: " + name); serviceEvents.add(fn); return () => serviceEvents.delete(fn); },
+	effect(fn) { const dispose = fn(); if (dispose) effectDisposers.push(dispose); },
+	slots: {
+		inject(name, fn) { return fn(); },
+		register(options, component) { registrations.set(options.id, { options, component }); return () => registrations.delete(options.id); }
+	}
+};
+api.apply(ctx);
+assert.equal(registrations.size, 3);
+assert.equal(listSubscriptions, 0);
+services.sessions = { list: {
+	getSnapshot: () => list,
+	subscribe() { listSubscriptions++; return () => listUnsubscribed++; }
+} };
+serviceEvents.forEach((fn) => fn("sessions"));
+services.uiSession = { sessionStatus: {
+	getSnapshot: () => ({ late: { running: true } }),
+	subscribe(fn) { statusListener = fn; statusSubscriptions++; return () => statusUnsubscribed++; }
+} };
+serviceEvents.forEach((fn) => fn("uiSession"));
+serviceEvents.forEach((fn) => fn("sessions"));
+assert.equal(listSubscriptions, 1);
+assert.equal(statusSubscriptions, 1);
+statusListener();
+const shared = registrations.get("dsh-session-top-new").options.inject().hooks.dock;
+const bell = registrations.get("dsh-session-top-new-bell").options.inject().source;
+assert.equal(shared.getSnapshot().items[0].running, true);
+assert.equal(bell.getSnapshot().runningCount, 1);
+assert.equal(bell.getSnapshot().items[0].title, "Late service");
+let opened;
+services.uiWorkspace = { openSession(id) { opened = id; } };
+bell.openSession("late");
+assert.equal(opened, "late", "bell jumps via uiWorkspace.openSession");
+effectDisposers.reverse().forEach((fn) => fn());
+assert.equal(registrations.size, 0);
+assert.equal(serviceEvents.size, 0);
+assert.equal(listUnsubscribed, 1);
+assert.equal(statusUnsubscribed, 1);
+assert.equal(frames.size, 0);
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal");

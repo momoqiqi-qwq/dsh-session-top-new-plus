@@ -1,7 +1,7 @@
 {
   "name": "dsh-session-top-new",
-  "version": "0.1.0",
-  "description": "Session overview dock for the DeepSeek Harness Web GUI: N-day session list, cross-session unread and running status, one-click jump, and a completion chime.",
+  "version": "0.2.0",
+  "description": "Session overview dock and sidebar activity bell for the DeepSeek Harness Web GUI: N-day session list, unread and running status, one-click jump, and a completion chime.",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -30,6 +30,8 @@
     "dsh-plugin",
     "session",
     "sidebar",
+    "bell",
+    "activity",
     "dock"
   ],
   "dsh": {

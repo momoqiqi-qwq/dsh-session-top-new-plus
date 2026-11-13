@@ -47,6 +47,45 @@ The dock in both themes — left is a light page, right is a dark one:
 
 ![Theme inversion preview](assets/theme-preview.png)
 
+## Sidebar activity bell / 侧栏活动铃铛
+
+Version 0.2.0 adds a 28px bell beside the search, filter and new-session
+controls in the left sidebar's Workspace / 工作区 header. It also recognizes
+Sessions / 会话 headers. The red dot breathes while there are unread results;
+the tooltip shows their count. The button follows the host theme and hides
+when the sidebar collapses to its narrow rail.
+
+Click the bell to open a 320px activity panel grouped as **Running / 运行中**,
+**Unread / 未读**, then **Recent / 最近**. Child sessions stay nested and
+collapsed until expanded; a child's activity promotes its parent group.
+Click a session to jump to it. Escape or a click outside closes the panel.
+The list uses the floating dock's N-day setting. The floating dock, its
+bookmarks, dragging, dismissal controls and completion chime remain available.
+The bell shares the dock's snapshot and never plays a second chime.
+
+DSH exposes no public actions slot in the sidebar header. The plugin therefore
+injects only the button into the header DOM and registers the panel as a second
+`shell.overlay` entry, `dsh-session-top-new-bell`. It never replaces
+`sidebar.workspaces`. Header markup can change between DSH releases. If a
+reliable title or search-control row cannot be found, the plugin logs one
+warning and leaves the floating dock as the entry point.
+
+Performance guards: one `MutationObserver` watches the sidebar subtree, with
+an immediate return while the button remains anchored. Header replacements
+coalesce into one animation-frame lookup, with no layout reads in the mutation
+callback and no anchor polling. Badge changes update DOM text and classes
+directly. The panel's contents mount lazily on the first open and remain hidden
+on close, preserving their scroll position and subscriptions. Rows stay within
+the dock's N-day window and are replaced through a `DocumentFragment` only when
+the snapshot changes. Unloading disconnects observers and removes the injected
+button, its stylesheet, panel hooks and shared data subscriptions.
+
+侧栏铃铛位于「工作区 / Workspace」标题旁，与搜索、筛选和新建会话按钮同排。
+点击查看运行中、未读及最近会话，子会话默认折叠，点击条目即可跳转。
+按 Escape 或点击面板外关闭，再次打开会保留滚动位置。侧栏收窄时自动隐藏。
+表头没有公共插槽，因此按钮采用 DOM 注入；宿主升级若改变表头结构，可能需要
+适配。找不到可靠位置时只警告一次，仍可使用原有悬浮窗。
+
 ## 中文说明
 
 功能一览：
@@ -80,14 +119,14 @@ per boot, so a newly installed plugin only appears after a restart.
 dsh.plugin.json     plugin manifest (id / version / main / engines)
 cordis.patch.yml    bundle patch: mounts the host plugin row
 lib/index.js        host entry (no-op; exists so the bundle mounts)
-lib/client.js       the dock: __ModuleLoader__ bundle (apply + widget)
+lib/client.js       dock + sidebar bell: __ModuleLoader__ bundle (no build step)
 assets/             screenshots
 screenshots.json    storefront screenshot list
 ```
 
 ## How it works
 
-The widget registers a root-scope `shell.overlay` entry, so it floats above the
+The dock registers a root-scope `shell.overlay` entry, so it floats above the
 whole app regardless of panel or session. It reads two client services and
 keeps only the leaf fields it renders:
 
@@ -98,7 +137,9 @@ keeps only the leaf fields it renders:
 | Jump to a session | `uiWorkspace.openSession(id)` |
 
 The `dock` observable subscribes to both sources, extracts a flat snapshot of
-scalars, and hands the widget a referentially stable object. A `running →
+scalars, and hands both surfaces a referentially stable object. The bell derives
+its counts and list from that source without subscribing to host services again.
+A `running →
 finished` transition (or a new `completionUnread` flag) triggers the chime,
 respecting the mute toggle.
 
