@@ -211,6 +211,18 @@ assert.equal(root.hidden, false);
 assert.equal(scroll.scrollTop, 77);
 assert.equal(stateWrites, 1, "badge/open changes do not re-render the React panel after first mount");
 assert.equal(source.getSnapshot().open, true);
+// Opening a row must clear its unread flag even while the host keeps reporting it,
+// so the session drops out of Unread into Recent on the very click.
+assert.match(scroll.textContent, /未读 \/ Unread[\s\S]*Unread/);
+assert.equal(source.getSnapshot().unreadCount, 1);
+source.markSeen("unread");
+assert.equal(source.getSnapshot().unreadCount, 0, "opening clears the unread count immediately");
+assert.equal(source.getSnapshot().items.find((it) => it.id === "unread").unread, false);
+assert.doesNotMatch(scroll.textContent, /未读 \/ Unread/, "empty Unread group is skipped");
+assert.match(scroll.textContent, /最近 \/ Recent[\s\S]*Unread/, "opened row is regrouped into Recent");
+assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0", "badge drops on the same click");
+listeners.forEach((fn) => fn());
+assert.equal(source.getSnapshot().items.find((it) => it.id === "unread").unread, false, "host still reporting unread cannot resurrect the row");
 document.dispatchEvent({ type: "keydown", key: "Escape" });
 assert.equal(root.hidden, true);
 assert.equal(document.activeElement, anchor.button);

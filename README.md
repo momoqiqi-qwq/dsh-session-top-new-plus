@@ -59,6 +59,9 @@ Click the bell to open a 320px activity panel grouped as **Running / 运行中**
 **Unread / 未读**, then **Recent / 最近**. Child sessions stay nested and
 collapsed until expanded; a child's activity promotes its parent group.
 Click a session to jump to it. Escape or a click outside closes the panel.
+Opening an unread session clears its flag on the spot, so the row leaves
+Unread and lands in Recent the moment you click it — even while the host is
+still reporting it unread. Escape or a click outside closes the panel.
 The list uses the floating dock's N-day setting. The floating dock, its
 bookmarks, dragging, dismissal controls and completion chime remain available.
 The bell shares the dock's snapshot and never plays a second chime.
