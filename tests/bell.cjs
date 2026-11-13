@@ -321,4 +321,33 @@ assert.equal(serviceEvents.size, 0);
 assert.equal(listUnsubscribed, 1);
 assert.equal(statusUnsubscribed, 1);
 assert.equal(frames.size, 0);
+// The shipped sidebar root only carries hashed CSS-module classes (wtg9ga_root)
+// and its section header is a plain div, so nothing matches a sidebar-ish
+// selector. The bell must still anchor on the 工作区 row via the document scope.
+sidebar.remove();
+const shipped = new Element("div"); shipped.className = "wtg9ga_root wtg9ga_wide";
+document.body.append(shipped);
+const shippedHeader = new Element("div"); shippedHeader.className = "wnFoaW_sectionHeader";
+const shippedLabel = new Element("span"); shippedLabel.className = "wnFoaW_sectionLabel"; shippedLabel.textContent = "工作区";
+const searchSlot = new Element("div"); searchSlot.className = "wnFoaW_searchSlot";
+const searchBtn = new Element("button"); searchBtn.setAttribute("aria-label", "搜索会话");
+searchSlot.append(searchBtn);
+const shippedActions = new Element("div"); shippedActions.className = "wnFoaW_headerActions";
+shippedActions.append(new Element("button"), new Element("button"));
+shippedHeader.append(shippedLabel, searchSlot, shippedActions);
+shipped.append(shippedHeader);
+const shippedSource = api.createBellSource(dock, {});
+const shippedAnchor = api.mountSidebarBell(shippedSource);
+flush();
+assert.equal(shippedAnchor.button.parentElement, shippedHeader, "anchors the shipped hashed-class header row");
+assert.equal(shippedHeader.children.indexOf(shippedAnchor.button), 1, "sits directly before the search slot");
+assert.equal(mutations[mutations.length - 1].target, document.body, "document scope is the observer fallback");
+const shippedLookups = document.body.lookups;
+for (let i = 0; i < 500; i++) mutations[mutations.length - 1].fn();
+assert.equal(document.body.lookups, shippedLookups, "attached button keeps document-scope callbacks O(1)");
+shippedHeader.remove();
+for (let i = 0; i < 5; i++) { mutations[mutations.length - 1].fn(); flush(); }
+assert.equal(shippedAnchor.button.isConnected, false, "a missing row leaves the bell out of the document");
+shippedAnchor.dispose();
+
 console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal");

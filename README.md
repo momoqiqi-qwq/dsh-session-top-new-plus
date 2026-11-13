@@ -66,14 +66,24 @@ The bell shares the dock's snapshot and never plays a second chime.
 DSH exposes no public actions slot in the sidebar header. The plugin therefore
 injects only the button into the header DOM and registers the panel as a second
 `shell.overlay` entry, `dsh-session-top-new-bell`. It never replaces
-`sidebar.workspaces`. Header markup can change between DSH releases. If a
-reliable title or search-control row cannot be found, the plugin logs one
-warning and leaves the floating dock as the entry point.
+`sidebar.workspaces`. The shipped sidebar root only carries hashed CSS-module
+classes (`wtg9ga_root`) and its section header is a plain `div`, so no stable
+attribute selector matches it: the plugin looks for the `工作区 / Workspaces`
+(or `会话 / Sessions`) label, climbs to the row that holds two to eight
+controls, and inserts the button immediately before the search control. When no
+scoped container matches, that search falls back to the document. Header markup
+can change between DSH releases. If a reliable title or search-control row
+cannot be found, the plugin logs one warning and leaves the floating dock as
+the entry point.
 
-Performance guards: one `MutationObserver` watches the sidebar subtree, with
-an immediate return while the button remains anchored. Header replacements
+Performance guards: one `MutationObserver` watches the anchor subtree — the
+sidebar when a scoped element matched, otherwise the document — with an
+immediate return while the button remains anchored. Header replacements
 coalesce into one animation-frame lookup, with no layout reads in the mutation
-callback and no anchor polling. Badge changes update DOM text and classes
+callback and no anchor polling. Failed lookups back off from 400 ms to 8 s, so a
+collapsed sidebar or a streaming turn cannot turn into a per-frame document
+scan; the backoff is state rather than a timer, so an idle page schedules
+nothing. Badge changes update DOM text and classes
 directly. The panel's contents mount lazily on the first open and remain hidden
 on close, preserving their scroll position and subscriptions. Rows stay within
 the dock's N-day window and are replaced through a `DocumentFragment` only when
