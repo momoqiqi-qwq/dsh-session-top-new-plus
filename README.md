@@ -37,9 +37,9 @@ lost in a long list again.
 - **Dismiss a row** — the ✕ that appears on hover hides that row; it comes back
   by itself once the session produces something newer. Dismissing a parent also
   hides its currently visible subagent rows.
-- **Inverts the page theme** — a light page gets dark chrome and a dark page gets
-  light chrome, so the panel never blends into whatever is behind it. It follows
-  DSH's own theme switch, so there is nothing to configure.
+- **Inverts the page theme by default** — a light page gets dark chrome and a
+  dark page gets light chrome, so the panel never blends into whatever is behind
+  it. A gear offers 自动 / 浅色 / 深色 if you would rather pin one.
 - **Collapsible** — expands by default; click the button to collapse it back to
   a single round button.
 
@@ -62,6 +62,14 @@ Click a session to jump to it. Escape or a click outside closes the panel.
 Opening an unread session clears its flag on the spot, so the row leaves
 Unread and lands in Recent the moment you click it — even while the host is
 still reporting it unread. Escape or a click outside closes the panel.
+
+The panel grows out of the bell: 190ms scale-and-fade on the way in, 130ms
+fade back towards it on the way out, with the transform origin following the
+flip side so it always leaves from the edge nearest the button. The bell
+nudges 12° while the panel is open, presses to 0.9 scale, and the unread dot
+pops in before it starts breathing. Panel visibility is a CSS state rather
+than the hidden attribute, so the exit animation finishes instead of being
+cut off; prefers-reduced-motion drops the transforms and keeps a short fade.
 The list uses the floating dock's N-day setting. The floating dock, its
 bookmarks, dragging, dismissal controls and completion chime remain available.
 The bell shares the dock's snapshot and never plays a second chime.
@@ -98,6 +106,31 @@ button, its stylesheet, panel hooks and shared data subscriptions.
 按 Escape 或点击面板外关闭，再次打开会保留滚动位置。侧栏收窄时自动隐藏。
 表头没有公共插槽，因此按钮采用 DOM 注入；宿主升级若改变表头结构，可能需要
 适配。找不到可靠位置时只警告一次，仍可使用原有悬浮窗。
+
+## Theme settings / 主题设置
+
+Version 0.3.0 adds a gear at the right of both panel headers (the sidebar bell
+panel and the floating dock). It opens a 自动 / 浅色 / 深色 row; the choice is
+shared by both surfaces and persists in localStorage under
+dsh-session-top-new.theme.
+
+**自动 is the inversion,** not the page's own colour: on a light page the panels
+are dark, on a dark page they are light. That keeps the chrome from blending
+into the surface behind it, which is the reason the plugin inverts in the first
+place. It watches body[data-ds-dark-theme] (falling back to a data-color-scheme
+or data-theme hint, then prefers-color-scheme), so flipping DSH's own theme
+switches the panels at the same moment. 浅色 and 深色 pin the palette and ignore
+the page.
+
+Each surface paints from its own data-dsb-theme attribute and a small set of CSS
+variables (--dsb-surface, --dsb-label, --dsb-active and friends), so the panel
+never depends on host tokens that a theme switch could leave stale. Escape
+closes the settings row before it closes the panel.
+
+主题设置：两个面板右上角的齿轮打开「自动 / 浅色 / 深色」，选择由两个面板共享，
+并保存在 localStorage 的 dsh-session-top-new.theme 下。**自动 = 与页面反色**
+（浅色页配深色面板，深色页配浅色面板），跟随 DSH 主题开关同步切换；浅色与深色
+则固定配色、忽略页面。
 
 ## 中文说明
 

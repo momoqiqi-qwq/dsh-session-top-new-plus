@@ -11,6 +11,7 @@ class Element {
 		this.attrs = {};
 		this.dataset = {};
 		this.style = {};
+		this.style.setProperty = (name, value) => { this.style[name] = String(value); };
 		this.listeners = new Map();
 		this.className = "";
 		this._text = "";
@@ -18,11 +19,14 @@ class Element {
 		this.hidden = false;
 		this.lookups = 0;
 		this.width = 280;
-		this.classList = { toggle: (name, on) => {
-			const names = new Set(this.className.split(" ").filter(Boolean));
-			if (on) names.add(name); else names.delete(name);
-			this.className = [...names].join(" ");
-		} };
+		const classNames = () => new Set(this.className.split(" ").filter(Boolean));
+		const commitClasses = (names) => { this.className = [...names].join(" "); };
+		this.classList = {
+			toggle: (name, on) => { const names = classNames(); if (on) names.add(name); else names.delete(name); commitClasses(names); },
+			add: (name) => { const names = classNames(); names.add(name); commitClasses(names); },
+			remove: (name) => { const names = classNames(); names.delete(name); commitClasses(names); },
+			contains: (name) => classNames().has(name)
+		};
 	}
 	get textContent() { return this._text + this.children.map((x) => x.textContent).join(""); }
 	set textContent(value) { this._text = String(value); this.children = []; }
@@ -30,6 +34,9 @@ class Element {
 	get clientWidth() { layoutReads++; return this.width; }
 	getBoundingClientRect() { layoutReads++; return { left: 150, top: buttonTop, bottom: buttonTop + 28 }; }
 	setAttribute(key, value) { this.attrs[key] = String(value); if (key === "id") this.id = value; }
+	getAttribute(key) { return key in this.attrs ? this.attrs[key] : null; }
+	hasAttribute(key) { return key in this.attrs; }
+	removeAttribute(key) { delete this.attrs[key]; }
 	contains(node) { return node === this || this.children.some((child) => child.contains(node)); }
 	append(...nodes) {
 		for (const node of nodes) {
@@ -93,7 +100,12 @@ document.getElementById = (id) => {
 };
 let layoutReads = 0;
 let buttonTop = 80;
-const window = Object.assign(new Element("window"), { innerWidth: 1200, innerHeight: 800 });
+const window = Object.assign(new Element("window"), {
+	innerWidth: 1200,
+	innerHeight: 800,
+	// A light page unless a test sets body[data-ds-dark-theme].
+	matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} })
+});
 const frames = new Map();
 let frameId = 0;
 const flush = () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach((fn) => fn()); };
@@ -127,7 +139,7 @@ const React = {
 let api;
 window.__ModuleLoader__ = { load(bundle) { api = bundle.factory(() => React); } };
 const sourceText = fs.readFileSync("lib/client.js", "utf8");
-const code = sourceText.replace("module.exports = { apply, inject };", "module.exports = { apply, inject, createBellSource, mountSidebarBell, BellPanel };");
+const code = sourceText.replace("module.exports = { apply, inject };", "module.exports = { apply, inject, createBellSource, createThemeSource, mountSidebarBell, BellPanel };");
 vm.runInNewContext(code, {
 	window, document, localStorage, React, MutationObserver, ResizeObserver, console,
 	requestAnimationFrame: (fn) => { frames.set(++frameId, fn); return frameId; },
@@ -186,7 +198,28 @@ assert.equal(sidebar.lookups, lookups + 1);
 assert.equal(anchor.button.parentElement, row);
 assert.equal(layoutReads, reads, "anchor recovery performs no layout read");
 
-const render = () => { refIndex = 0; effects = []; layouts = []; return api.BellPanel({ source, anchor }); };
+// Theme surface: the panel paints from its own attribute, never from host tokens,
+// and the gear row must drive the shared theme source.
+const themeCalls = [];
+const themeStub = {
+	mode: "auto",
+	resolved: "light",
+	roots: [],
+	listeners: new Set(),
+	getSnapshot() { return { mode: this.mode, resolved: this.resolved }; },
+	subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
+	setMode(next) {
+		this.mode = next;
+		themeCalls.push(next);
+		for (const fn of [...this.listeners]) fn(this.getSnapshot());
+	},
+	apply(el) {
+		this.roots.push(el);
+		el.setAttribute("data-dsb-theme", this.resolved);
+		return () => { this.roots = this.roots.filter((x) => x !== el); };
+	}
+};
+const render = () => { refIndex = 0; effects = []; layouts = []; return api.BellPanel({ source, anchor, theme: themeStub }); };
 assert.equal(render(), null, "panel contents absent before first open");
 const cleanups = effects.map((fn) => fn()).filter(Boolean);
 source.setOpen(true);
@@ -195,9 +228,30 @@ const tree = render();
 const root = new Element("div");
 root.className = "dsb-panel";
 const scroll = new Element("div"); scroll.className = "dsb-scroll";
-root.append(scroll); document.body.append(root); refs[0].current = root;
+const settingsEl = new Element("div"); settingsEl.className = "dsb-settings";
+const gearEl = new Element("button"); gearEl.setAttribute("data-settings", "1"); gearEl.setAttribute("aria-expanded", "false");
+root.append(gearEl, settingsEl, scroll); document.body.append(root); refs[0].current = root;
 const disposePanel = layouts[0]();
-assert.equal(root.hidden, false);
+// Visibility is a class so the open/close transition can play; the node never leaves the document.
+assert.match(root.className, /dsb-in/);
+assert.equal(root.attrs["aria-hidden"], "false");
+assert.equal(root.style["--dsb-origin"], "top left", "entry grows out of the bell on the anchored side");
+assert.equal(root.attrs["data-dsb-theme"], "light", "the panel paints from its own theme attribute");
+// Gear opens the picker; picking drives the shared source, not local state.
+root.dispatchEvent({ type: "click", target: gearEl });
+assert.match(settingsEl.className, /dsb-show/);
+assert.equal(gearEl.attrs["aria-expanded"], "true");
+const modeButtons = settingsEl.querySelectorAll("[data-mode]");
+assert.equal(modeButtons.length, 3, "自动 / 浅色 / 深色");
+assert.equal(modeButtons.map((b) => b.textContent).join("|"), "自动|浅色|深色");
+assert.equal(modeButtons[0].className, "on", "auto is the default pill");
+root.dispatchEvent({ type: "click", target: modeButtons[2] });
+assert.deepEqual(themeCalls, ["dark"], "the picker writes through the theme source");
+assert.equal(modeButtons[2].className, "on", "picked mode takes the pill");
+assert.equal(modeButtons[0].className, "", "previous pill clears");
+document.dispatchEvent({ type: "keydown", key: "Escape" });
+assert.doesNotMatch(settingsEl.className, /dsb-show/, "first Escape closes the settings row");
+assert.match(root.className, /dsb-in/, "and leaves the panel open");
 assert.match(scroll.textContent, /运行中 \/ Running.*Parent.*未读 \/ Unread.*Unread/);
 assert.doesNotMatch(scroll.textContent, /Child|Old|Blank/);
 const disclosure = scroll.querySelector("[data-expand]");
@@ -205,9 +259,10 @@ root.dispatchEvent({ type: "click", target: disclosure });
 assert.match(scroll.textContent, /Child/);
 scroll.scrollTop = 77;
 source.setOpen(false);
-assert.equal(root.hidden, true);
+assert.doesNotMatch(root.className, /dsb-in/, "closing only drops the class, leaving the exit transition free to run");
+assert.equal(root.attrs["aria-hidden"], "true");
 source.setOpen(true);
-assert.equal(root.hidden, false);
+assert.match(root.className, /dsb-in/);
 assert.equal(scroll.scrollTop, 77);
 assert.equal(stateWrites, 1, "badge/open changes do not re-render the React panel after first mount");
 assert.equal(source.getSnapshot().open, true);
@@ -224,12 +279,14 @@ assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0", "badge 
 listeners.forEach((fn) => fn());
 assert.equal(source.getSnapshot().items.find((it) => it.id === "unread").unread, false, "host still reporting unread cannot resurrect the row");
 document.dispatchEvent({ type: "keydown", key: "Escape" });
-assert.equal(root.hidden, true);
+assert.doesNotMatch(root.className, /dsb-in/);
 assert.equal(document.activeElement, anchor.button);
 source.setOpen(true);
 document.dispatchEvent({ type: "pointerdown", target: document.body });
-assert.equal(root.hidden, true);
+assert.doesNotMatch(root.className, /dsb-in/);
 buttonTop = 740; source.setOpen(true);
+assert.equal(root.style["--dsb-origin"], "bottom left", "flipped panel grows out of its bottom edge");
+assert.equal(root.style["--dsb-from"], "6px");
 assert.equal(root.style.top, "auto", "panel flips upward near bottom edge");
 assert.equal(root.style.bottom, "66px");
 sidebar.width = 60; resizes[0].fn();
@@ -362,4 +419,34 @@ for (let i = 0; i < 5; i++) { mutations[mutations.length - 1].fn(); flush(); }
 assert.equal(shippedAnchor.button.isConnected, false, "a missing row leaves the bell out of the document");
 shippedAnchor.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal");
+// Theme source: one resolved value for every surface that registers a root.
+const realTheme = api.createThemeSource();
+// A registered root must be attached — paint() drops detached elements on purpose.
+const fakeRoot = new Element("div");
+document.body.append(fakeRoot);
+const detachTheme = realTheme.apply(fakeRoot);
+assert.equal(realTheme.getSnapshot().mode, "auto");
+assert.equal(realTheme.getSnapshot().resolved, "dark", "a light page inverts to a dark panel");
+assert.equal(fakeRoot.attrs["data-dsb-theme"], "dark");
+// Several observers watch page attributes; the theme one is among them, so fire
+// every filtered observer instead of trusting array order.
+const attrObservers = mutations.filter((m) => m.config && m.config.attributeFilter);
+assert.ok(attrObservers.length > 0, "the theme source observes page attributes");
+const pokeTheme = () => { for (const o of attrObservers) o.fn(); };
+document.body.setAttribute("data-ds-dark-theme", "");
+pokeTheme();
+assert.equal(realTheme.getSnapshot().resolved, "light", "a dark page inverts to a light panel");
+assert.equal(fakeRoot.attrs["data-dsb-theme"], "light");
+realTheme.setMode("dark");
+assert.equal(localStorage.getItem("dsh-session-top-new.theme"), "dark", "the choice is persisted");
+assert.equal(fakeRoot.attrs["data-dsb-theme"], "dark", "an explicit mode ignores the page");
+document.body.removeAttribute("data-ds-dark-theme");
+pokeTheme();
+assert.equal(fakeRoot.attrs["data-dsb-theme"], "dark");
+realTheme.setMode("auto");
+assert.equal(fakeRoot.attrs["data-dsb-theme"], "dark");
+localStorage.removeItem("dsh-session-top-new.theme");
+detachTheme();
+realTheme.dispose();
+
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; inverted auto theme; gear picker; persisted mode");
