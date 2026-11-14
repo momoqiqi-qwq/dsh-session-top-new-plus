@@ -20,9 +20,11 @@ lost in a long list again.
 
 - **Overview, not per-session** — the dock is a global aggregate: you see the
   state of *all* sessions while you are inside one of them.
-- **Live status** — a running session shows a pulsing green dot; a session
-  whose result you have not looked at shows an amber dot and a bold title; the
-  round button carries a red badge counting unread results.
+- **Live status, in the host's own language** — rows use the same StateDot the
+  official sidebar uses, with the same precedence: a session waiting on you is
+  amber, a *running* one is the rotating ring (not a dot), a result you have not
+  looked at is a solid green dot, everything else is neutral. The round button
+  carries a red badge counting unread results.
 - **N-day history** — shows sessions updated within the last N days (default:
   today only). N is editable in the panel header, 1–365.
 - **Click to jump** — clicking a session switches the main view straight to it.
@@ -106,6 +108,28 @@ button, its stylesheet, panel hooks and shared data subscriptions.
 按 Escape 或点击面板外关闭，再次打开会保留滚动位置。侧栏收窄时自动隐藏。
 表头没有公共插槽，因此按钮采用 DOM 注入；宿主升级若改变表头结构，可能需要
 适配。找不到可靠位置时只警告一次，仍可使用原有悬浮窗。
+
+### Row markers / 行首标识
+
+The row leading mark is a copy of the host's, not a look-alike:
+
+| State | Mark | Source of truth |
+| --- | --- | --- |
+| waiting on you | amber dot | `StateDot` `warning` |
+| running | 14px rotating ring + breathing arc | `StateDot` `ongoing` |
+| finished, not opened | green dot | `StateDot` `done` |
+| idle | neutral dot at 50% | `StateDot` `idle` |
+
+Geometry follows the host exactly: a 10px slot painting a 6px core through
+`inset: 20%` and `currentColor`; the ring is a 24-unit viewBox with two `r 9.5`
+circles, a 25%-opacity track and a `12 150` → `24 150` dash cycle over 1.5s. The
+disclosure chevron is also the host's filled triangle (`0 0 16 16`), rotated 90°
+by CSS so opening animates instead of swapping glyphs. Reduced-motion disables
+both the spin and the rotation, leaving the arc as a static 18-unit segment.
+
+Deliberate consequence: "running" is no longer green. Green belongs to
+*finished and unread* — that is the host's meaning, and matching it is the whole
+point of this section.
 
 ## Theme settings / 主题设置
 

@@ -33,7 +33,13 @@ class Element {
 	get isConnected() { return this === document || Boolean(this.parentElement?.isConnected); }
 	get clientWidth() { layoutReads++; return this.width; }
 	getBoundingClientRect() { layoutReads++; return { left: 150, top: buttonTop, bottom: buttonTop + 28 }; }
-	setAttribute(key, value) { this.attrs[key] = String(value); if (key === "id") this.id = value; }
+	setAttribute(key, value) {
+		this.attrs[key] = String(value);
+		if (key === "id") this.id = value;
+		// Browsers reflect class through className; the fixture has to do it too,
+		// or SVG built with setAttribute("class", …) looks unclassed to selectors.
+		if (key === "class") this.className = String(value);
+	}
 	getAttribute(key) { return key in this.attrs ? this.attrs[key] : null; }
 	hasAttribute(key) { return key in this.attrs; }
 	removeAttribute(key) { delete this.attrs[key]; }
@@ -257,9 +263,18 @@ assert.doesNotMatch(settingsEl.className, /dsb-show/, "first Escape closes the s
 assert.match(root.className, /dsb-in/, "and leaves the panel open");
 assert.match(scroll.textContent, /运行中 \/ Running.*Parent.*未读 \/ Unread.*Unread/);
 assert.doesNotMatch(scroll.textContent, /Child|Old|Blank/);
+// Markers mirror the host: running is a ring, unread is the amber dot, and the
+// disclosure is the filled triangle — not a home-made dot and a text glyph.
+const marks = scroll.querySelectorAll(".dsb-state");
+assert.ok(marks.length >= 2, "idle and flagged rows share one state-dot slot");
+assert.ok(marks.some((m) => m.dataset.state === "done"), "an unread row is the host's green done dot");
 const disclosure = scroll.querySelector("[data-expand]");
+assert.ok(disclosure.querySelector(".dsb-arrow"), "the triangle lives inside the expand button");
 root.dispatchEvent({ type: "click", target: disclosure });
 assert.match(scroll.textContent, /Child/);
+// The live session is the nested one, so its ring only appears after expanding.
+assert.ok(scroll.querySelector(".dsb-spin"), "a running row draws the rotating ring, not a dot");
+assert.equal(scroll.querySelectorAll(".dsb-state").filter((m) => m.dataset.state === "idle").length >= 1, true);
 scroll.scrollTop = 77;
 source.setOpen(false);
 assert.doesNotMatch(root.className, /dsb-in/, "closing only drops the class, leaving the exit transition free to run");
