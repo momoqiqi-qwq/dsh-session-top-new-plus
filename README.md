@@ -127,6 +127,17 @@ variables (--dsb-surface, --dsb-label, --dsb-active and friends), so the panel
 never depends on host tokens that a theme switch could leave stale. Escape
 closes the settings row before it closes the panel.
 
+### Motion / 动效
+
+0.3.1 makes the gear feel like a button and the row feel like it belongs to it:
+the gear turns 90° and fills in when open, scales down on press, and settles on
+hover; the settings row unfolds from a 0fr grid track (240ms) instead of
+appearing; the three modes share a sliding thumb (240ms, one element moving
+under the labels) rather than three buttons swapping backgrounds; the panel
+cross-fades its colours (220ms) when you pick a mode, and the hint on the right
+of the row spells out what 自动 resolved to right now. All of it is transform
+and opacity only, and prefers-reduced-motion keeps just the cross-fade.
+
 主题设置：两个面板右上角的齿轮打开「自动 / 浅色 / 深色」，选择由两个面板共享，
 并保存在 localStorage 的 dsh-session-top-new.theme 下。**自动 = 与页面反色**
 （浅色页配深色面板，深色页配浅色面板），跟随 DSH 主题开关同步切换；浅色与深色
