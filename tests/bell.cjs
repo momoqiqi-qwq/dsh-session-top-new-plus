@@ -75,11 +75,24 @@ class Element {
 	matches(selector) {
 		return selector.split(",").some((part) => {
 			part = part.trim();
+			// "A B" — the descendant form: self must match the last compound, some
+			// ancestor the first. Enough for scoped lookups like ".dsb-seg button".
+			const space = part.indexOf(" ");
+			if (space > 0) {
+				const ancestor = part.slice(0, space);
+				const rest = part.slice(space + 1).trim();
+				return this.matches(rest) && Boolean(this.parentElement && this.parentElement.closest(ancestor));
+			}
 			if (part.startsWith(".")) return this.className.split(" ").includes(part.slice(1));
 			if (part.startsWith("[class*=")) return this.className.toLowerCase().includes(/="([^"]+)"/.exec(part)[1].toLowerCase());
 			if (part.startsWith("[data-")) {
 				const match = /^\[data-([\w-]+)(?:="([^"]+)")?\]$/.exec(part);
-				return Boolean(match && (match[2] ? this.attrs["data-" + match[1]] === match[2] : this.dataset[match[1]] !== undefined));
+				// A bare [data-x] matches an attribute or a dataset entry, the way a
+				// browser does — otherwise setAttribute-only markers look unmatched.
+				const key = match ? "data-" + match[1] : "";
+				return Boolean(match && (match[2]
+					? this.attrs[key] === match[2]
+					: this.attrs[key] !== undefined || this.dataset[match[1]] !== undefined));
 			}
 			if (part.includes("aria-label*=")) {
 				const term = /="([^"]+)"/.exec(part)[1];
@@ -247,17 +260,48 @@ assert.equal(root.attrs["data-dsb-theme"], "light", "the panel paints from its o
 root.dispatchEvent({ type: "click", target: gearEl });
 assert.match(settingsEl.className, /dsb-show/);
 assert.equal(gearEl.attrs["aria-expanded"], "true");
-const modeButtons = settingsEl.querySelectorAll("[data-mode]");
+const segEl = settingsEl.querySelector(".dsb-seg");
+// Scoped to the segment's own buttons: the seg carries data-mode itself to move
+// the thumb, so an unscoped [data-mode] sweep would paint the track as a pill.
+const modeButtons = segEl.querySelectorAll("button");
 assert.equal(modeButtons.length, 3, "自动 / 浅色 / 深色");
 assert.equal(modeButtons.map((b) => b.textContent).join("|"), "自动|浅色|深色");
 assert.equal(modeButtons[0].className, "on", "auto is the default pill");
-assert.equal(settingsEl.querySelector(".dsb-seg").attrs["data-mode"], "auto", "the thumb rides the shared mode");
+assert.doesNotMatch(segEl.className, /\bon\b/, "the track never takes the pill class");
+assert.equal(segEl.attrs["data-mode"], "auto", "the thumb rides the shared mode");
 assert.match(settingsEl.querySelector(".dsb-settings-now").textContent, /浅色/, "the row says what auto resolved to");
 root.dispatchEvent({ type: "click", target: modeButtons[2] });
 assert.deepEqual(themeCalls, ["dark"], "the picker writes through the theme source");
 assert.equal(modeButtons[2].className, "on", "picked mode takes the pill");
-assert.equal(settingsEl.querySelector(".dsb-seg").attrs["data-mode"], "dark", "the thumb slides to the picked mode");
+assert.equal(segEl.attrs["data-mode"], "dark", "the thumb slides to the picked mode");
 assert.equal(modeButtons[0].className, "", "previous pill clears");
+// Do-not-disturb switches, one per kind of nudge. They silence the reminder —
+// count, badge, dock dot and chime — never the row's own state.
+const alertToggles = settingsEl.querySelectorAll("[data-alert]");
+assert.equal(alertToggles.length, 2, "任务完成时弹出 / 需要选择时弹出");
+assert.deepEqual(alertToggles.map((t) => t.dataset.alert), ["done", "pick"], "switches keep their declared order");
+assert.deepEqual(alertToggles.map((t) => t.attrs["aria-label"]), ["任务完成时弹出", "需要选择时弹出"]);
+assert.deepEqual(settingsEl.querySelectorAll(".dsb-settings-alert").map((r) => r.querySelector(".dsb-settings-label").textContent),
+	["任务完成时弹出", "需要选择时弹出"], "each switch is labelled by its own row");
+assert.deepEqual(alertToggles.map((t) => t.attrs.role), ["switch", "switch"]);
+assert.deepEqual(alertToggles.map((t) => t.attrs["aria-checked"]), ["true", "true"], "both nudges fire out of the box");
+assert.equal(source.getSnapshot().unreadCount, 1);
+assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "1", "the bell starts at one");
+assert.match(anchor.button.className, /dsb-unread/, "a live count lights the bell");
+root.dispatchEvent({ type: "click", target: alertToggles[0] });
+assert.equal(alertToggles[0].attrs["aria-checked"], "false", "the switch flips on click");
+assert.equal(localStorage.getItem("dsh-session-top-new.alert.done"), "0", "the switch is persisted");
+assert.equal(alertToggles[1].attrs["aria-checked"], "true", "only the clicked switch moves");
+assert.equal(source.getSnapshot().unreadCount, 0, "muting finished tasks drops the count");
+assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0", "and the badge with it");
+assert.doesNotMatch(anchor.button.className, /dsb-unread/, "the dock dot goes dark");
+assert.equal(source.getSnapshot().items.find((it) => it.id === "unread").unread, true, "the row keeps its unread flag");
+assert.match(scroll.textContent, /Unread/, "the finished row is still listed, just silent");
+root.dispatchEvent({ type: "click", target: alertToggles[0] });
+assert.equal(alertToggles[0].attrs["aria-checked"], "true", "clicking again restores it");
+assert.equal(localStorage.getItem("dsh-session-top-new.alert.done"), "1");
+assert.equal(source.getSnapshot().unreadCount, 1, "the count comes back");
+assert.match(anchor.button.className, /dsb-unread/);
 document.dispatchEvent({ type: "keydown", key: "Escape" });
 assert.doesNotMatch(settingsEl.className, /dsb-show/, "first Escape closes the settings row");
 assert.match(root.className, /dsb-in/, "and leaves the panel open");
@@ -316,6 +360,19 @@ dockState = { ...dockState, items: dockState.items.map((it) => ({ ...it, unread:
 listeners.forEach((fn) => fn());
 assert.doesNotMatch(anchor.button.className, /dsb-unread/);
 assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0");
+// The other switch governs work waiting on a choice: muting it must leave
+// finished tasks alone, and muting that one must leave the choice visible.
+dockState = { ...dockState, items: [...dockState.items, { id: "pick", title: "Waiting on you", pending: true, updatedAt: Date.now() }] };
+listeners.forEach((fn) => fn());
+assert.equal(source.getSnapshot().unreadCount, 1, "a pending session nudges the bell");
+assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "1");
+root.dispatchEvent({ type: "click", target: alertToggles[1] });
+assert.equal(alertToggles[1].attrs["aria-checked"], "false");
+assert.equal(localStorage.getItem("dsh-session-top-new.alert.pick"), "0", "the pick switch persists on its own key");
+assert.equal(source.getSnapshot().unreadCount, 0, "muting the choice nudge silences it");
+assert.equal(source.getSnapshot().items.find((it) => it.id === "pick").pending, true, "the choice itself is still pending");
+root.dispatchEvent({ type: "click", target: alertToggles[1] });
+assert.equal(source.getSnapshot().unreadCount, 1, "and it comes back");
 assert.equal(stateWrites, 1);
 localStorage.setItem("dsh-session-top-new.days", "7");
 window.dispatchEvent({ type: "dsh-session-top-new:days" });
