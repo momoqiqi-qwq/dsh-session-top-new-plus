@@ -60,10 +60,14 @@ when the sidebar collapses to its narrow rail.
 Click the bell to open a 320px activity panel grouped as **Running / 运行中**,
 **Unread / 未读**, then **Recent / 最近**. Child sessions stay nested and
 collapsed until expanded; a child's activity promotes its parent group.
-Click a session to jump to it. Escape or a click outside closes the panel.
-Opening an unread session clears its flag on the spot, so the row leaves
-Unread and lands in Recent the moment you click it — even while the host is
-still reporting it unread. Escape or a click outside closes the panel.
+Click a session to jump to it. Opening an unread session clears its flag on
+the spot, so the row leaves Unread and lands in Recent the moment you click
+it — even while the host is still reporting it unread. The session on screen
+is never unread (you are looking at it), and the Unread header carries a
+small **全部已读 / mark all read** control, so the whole group can be emptied
+in one click instead of one row at a time. Rows waiting on a choice stay:
+they are asking for an answer, not for attention. Escape or a click outside
+closes the panel.
 
 The panel grows out of the bell: 190ms scale-and-fade on the way in, 130ms
 fade back towards it on the way out, with the transform origin following the

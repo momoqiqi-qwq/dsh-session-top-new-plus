@@ -431,6 +431,42 @@ dockState = { items: [], current: null };
 listeners.forEach((fn) => fn());
 source.setOpen(true);
 assert.equal(scroll.textContent, "没有进行中的会话 / No running sessions");
+// The session on screen cannot be unread — you are looking at it — and the rest
+// must be clearable in one go, or Unread is a group you can never empty.
+dockState = { items: [
+	{ id: "watched", title: "Watched", unread: true, updatedAt: Date.now() },
+	{ id: "other", title: "Other", unread: true, updatedAt: Date.now() }
+], current: "watched" };
+listeners.forEach((fn) => fn());
+let snap = source.getSnapshot();
+assert.equal(snap.items.find((it) => it.id === "watched").unread, false, "the session on screen counts as read");
+assert.equal(snap.items.find((it) => it.id === "other").unread, true, "the one you are not looking at stays unread");
+assert.equal(snap.unreadCount, 1, "only the unseen session nudges");
+assert.match(scroll.textContent, /未读 \/ Unread/);
+const clearBtn = scroll.querySelector("[data-clear-unread]");
+assert.ok(clearBtn, "the Unread header carries a mark-all-read control");
+assert.equal(clearBtn.textContent, "全部已读");
+root.dispatchEvent({ type: "click", target: clearBtn });
+snap = source.getSnapshot();
+assert.equal(snap.unreadCount, 0, "one click clears every unread row");
+assert.equal(snap.items.every((it) => it.unread === false), true);
+assert.doesNotMatch(scroll.textContent, /未读 \/ Unread/, "the header leaves with its group");
+assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0", "the badge empties with it");
+// Marking read is not marking answered: a row waiting on a choice keeps asking.
+dockState = { items: [
+	{ id: "finished", title: "Finished", unread: true, updatedAt: Date.now() },
+	{ id: "ask", title: "Ask", pending: true, updatedAt: Date.now() }
+], current: null };
+listeners.forEach((fn) => fn());
+assert.equal(source.getSnapshot().unreadCount, 2);
+const clearAgain = scroll.querySelector("[data-clear-unread]");
+assert.ok(clearAgain);
+root.dispatchEvent({ type: "click", target: clearAgain });
+snap = source.getSnapshot();
+assert.equal(snap.items.find((it) => it.id === "finished").unread, false, "the finished row goes quiet");
+assert.equal(snap.items.find((it) => it.id === "ask").pending, true, "the pending row is untouched");
+assert.equal(snap.unreadCount, 1, "a row that still needs an answer keeps nudging");
+assert.ok(scroll.querySelector("[data-clear-unread]"), "and its group header stays");
 localStorage.removeItem("dsh-session-top-new.days");
 anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
 assert.equal(listeners.size, 0);
