@@ -158,7 +158,7 @@ const React = {
 let api;
 window.__ModuleLoader__ = { load(bundle) { api = bundle.factory(() => React); } };
 const sourceText = fs.readFileSync("lib/client.js", "utf8");
-const code = sourceText.replace("module.exports = { apply, inject };", "module.exports = { apply, inject, createBellSource, createThemeSource, mountSidebarBell, BellPanel };");
+const code = sourceText.replace("module.exports = { apply, inject };", "module.exports = { apply, inject, createBellSource, createThemeSource, mountSidebarBell, BellPanel, countNudges };");
 vm.runInNewContext(code, {
 	window, document, localStorage, React, MutationObserver, ResizeObserver, console,
 	requestAnimationFrame: (fn) => { frames.set(++frameId, fn); return frameId; },
@@ -302,6 +302,21 @@ assert.equal(alertToggles[0].attrs["aria-checked"], "true", "clicking again rest
 assert.equal(localStorage.getItem("dsh-session-top-new.alert.done"), "1");
 assert.equal(source.getSnapshot().unreadCount, 1, "the count comes back");
 assert.match(anchor.button.className, /dsb-unread/);
+// The counter behind badge, footer and chime: one row nudges at most once, the
+// two switches gate their own kind of nudge, and the session you are looking at
+// never nudges you about itself.
+const nudgeRows = [
+	{ id: "a", unread: true },
+	{ id: "b", pending: true },
+	{ id: "c", unread: true, pending: true },
+	{ id: "cur", unread: true, pending: true }
+];
+assert.equal(api.countNudges(nudgeRows, "cur", { done: true, pick: true }), 3, "both on: only the open session is skipped");
+assert.equal(api.countNudges(nudgeRows, "cur", { done: false, pick: true }), 2, "done muted: finished rows go quiet");
+assert.equal(api.countNudges(nudgeRows, "cur", { done: true, pick: false }), 2, "pick muted: waiting rows go quiet");
+assert.equal(api.countNudges(nudgeRows, "cur", { done: false, pick: false }), 0, "both muted: nothing nudges");
+assert.equal(api.countNudges(nudgeRows, "cur", null), 3, "a host without the switches behaves like both on");
+assert.equal(api.countNudges(nudgeRows, "a", { done: true, pick: true }), 3, "whichever session is open drops out of the count");
 document.dispatchEvent({ type: "keydown", key: "Escape" });
 assert.doesNotMatch(settingsEl.className, /dsb-show/, "first Escape closes the settings row");
 assert.match(root.className, /dsb-in/, "and leaves the panel open");
@@ -374,6 +389,41 @@ assert.equal(source.getSnapshot().items.find((it) => it.id === "pick").pending, 
 root.dispatchEvent({ type: "click", target: alertToggles[1] });
 assert.equal(source.getSnapshot().unreadCount, 1, "and it comes back");
 assert.equal(stateWrites, 1);
+// The picker was folded by the earlier Escape; open it to watch the paint.
+root.dispatchEvent({ type: "click", target: gearEl });
+assert.match(settingsEl.className, /dsb-show/);
+// Switches are shared state: a write from another window has to reach the paint,
+// otherwise this panel shows "on" for a nudge that is already muted.
+localStorage.setItem("dsh-session-top-new.alert.done", "0");
+window.dispatchEvent({ type: "storage" });
+assert.equal(alertToggles[0].attrs["aria-checked"], "false", "an outside write repaints the open picker");
+assert.equal(source.getSnapshot().unreadCount, 1, "done muted, pick on: the waiting row still nudges");
+// A stale attribute cannot turn the first click into a no-op: the click reads the store.
+alertToggles[0].setAttribute("aria-checked", "true");
+let broadcasts = 0;
+const countBroadcast = () => { broadcasts++; };
+window.addEventListener("dsh-session-top-new:alerts", countBroadcast);
+root.dispatchEvent({ type: "click", target: alertToggles[0] });
+assert.equal(localStorage.getItem("dsh-session-top-new.alert.done"), "1", "the click writes the value the store was missing");
+assert.equal(alertToggles[0].attrs["aria-checked"], "true");
+window.removeEventListener("dsh-session-top-new:alerts", countBroadcast);
+// A store that refuses the write must not be papered over with a fake "changed".
+const realSetItem = localStorage.setItem;
+localStorage.setItem = () => { throw new Error("QuotaExceededError"); };
+broadcasts = 0;
+window.addEventListener("dsh-session-top-new:alerts", countBroadcast);
+root.dispatchEvent({ type: "click", target: alertToggles[0] });
+window.removeEventListener("dsh-session-top-new:alerts", countBroadcast);
+localStorage.setItem = realSetItem;
+assert.equal(broadcasts, 0, "a refused write announces nothing");
+assert.equal(source.getAlerts().done, true, "the switch rolls back to what the store still says");
+assert.equal(alertToggles[0].attrs["aria-checked"], "true", "and the paint follows the rollback");
+assert.equal(localStorage.getItem("dsh-session-top-new.alert.done"), "1");
+// The accessor hands out a copy: poking it must not move the source of truth.
+const borrowed = source.getAlerts();
+borrowed.done = false;
+assert.equal(source.getAlerts().done, true, "getAlerts returns a copy");
+assert.equal(source.getSnapshot().unreadCount, 1);
 localStorage.setItem("dsh-session-top-new.days", "7");
 window.dispatchEvent({ type: "dsh-session-top-new:days" });
 assert.equal(source.getSnapshot().items.some((it) => it.id === "old"), true, "bell follows dock day setting");
