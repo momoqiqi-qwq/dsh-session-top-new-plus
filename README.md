@@ -171,6 +171,27 @@ and opacity only, and prefers-reduced-motion keeps just the cross-fade.
 （浅色页配深色面板，深色页配浅色面板），跟随 DSH 主题开关同步切换；浅色与深色
 则固定配色、忽略页面。
 
+## Reveal in sidebar / 侧栏定位
+
+0.3.3 adds a 侧栏定位 switch under the theme row, in both panels. On by default.
+With it on, clicking a session here (bell or dock) does two things in order: the
+session opens, then the host sidebar scrolls so that session's own row is on
+screen — the same `scrollIntoView({ block: 'nearest' })` the shipped rows use
+themselves, aimed at their `data-row-key="session:<id>"` marker. Off, only the
+session opens and the sidebar stays where you left it.
+
+The plugin never expands a collapsed project group to reach a row that is not
+mounted: that tree belongs to you, and silently reshaping it to satisfy a scroll
+would be worse than doing nothing. The preference lives in localStorage under
+dsh-session-top-new.reveal and is shared by both surfaces, like the theme.
+
+侧栏定位：两个面板的主题行下面多一个开关，默认开启。开启后点这里的会话（铃铛或
+悬浮条）会先切到该会话，再把左侧边栏滚到它自己那一行——用的是官方行自己也在用的
+`scrollIntoView({ block: 'nearest' }`），定位靠官方行的 `data-row-key="session:<id>"`
+标记。关闭后只切会话，侧栏不动。**不会替你展开折叠的项目分组**：那棵树的状态归你，
+为了滚一下去改它比什么都不做更糟。开关存在 localStorage 的
+dsh-session-top-new.reveal 下，两个面板共享。
+
 ## 中文说明
 
 功能一览：
