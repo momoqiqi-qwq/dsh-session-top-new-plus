@@ -298,6 +298,44 @@ assert.equal(localStorage.getItem("dsh-session-top-new.dock"), "0", "hiding the 
 root.dispatchEvent({ type: "click", target: dockToggle });
 assert.equal(dockToggle.attrs["aria-checked"], "true", "clicking again brings it back");
 assert.equal(localStorage.getItem("dsh-session-top-new.dock"), "1");
+// Right-click a session: the bookmark path that needs nothing from the transcript
+// but the row's id and title, which is why it cannot fail the way the reply
+// button could (a message body whose markup we can no longer read).
+const rowJump = scroll.querySelector("[data-session]");
+assert.ok(rowJump, "the list has a row to right-click");
+const rowId = rowJump.dataset.session; // the fixture keeps dataset and attrs apart
+rowJump.title = "Right-clicked session";
+root.dispatchEvent({
+	type: "contextmenu",
+	target: rowJump,
+	clientX: 200,
+	clientY: 300,
+	preventDefault() { this.defaultPrevented = true; },
+	stopPropagation() {}
+});
+const menuEl = root.querySelector(".dsb-menu");
+assert.ok(menuEl, "right-click opens a menu inside the panel");
+assert.equal(menuEl.attrs.role, "menu");
+const favItem = menuEl.querySelector("[data-fav-toggle]");
+assert.equal(favItem.attrs["data-fav-toggle"], rowId, "the item carries the session it acts on");
+assert.equal(favItem.textContent, "加入书签", "an unbookmarked session offers to add one");
+root.dispatchEvent({ type: "click", target: favItem });
+assert.equal(root.querySelector(".dsb-menu"), null, "picking an item closes the menu");
+const storedFavs = JSON.parse(localStorage.getItem("dsh-session-top-new.favorites") || "[]");
+assert.equal(storedFavs.length, 1, "one bookmark after one click");
+assert.equal(storedFavs[0].id, "session:" + rowId, "a session bookmark is keyed by the session");
+assert.equal(storedFavs[0].text, "Right-clicked session", "the row title stands in for an unreadable turn");
+root.dispatchEvent({
+	type: "contextmenu",
+	target: rowJump,
+	clientX: 200,
+	clientY: 300,
+	preventDefault() {},
+	stopPropagation() {}
+});
+assert.equal(root.querySelector("[data-fav-toggle]").textContent, "移除书签", "a bookmarked session offers to remove it");
+document.dispatchEvent({ type: "keydown", key: "Escape" });
+assert.equal(root.querySelector(".dsb-menu"), null, "Escape dismisses the menu");
 
 assert.equal(source.getSnapshot().unreadCount, 1);
 assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "1", "the bell starts at one");

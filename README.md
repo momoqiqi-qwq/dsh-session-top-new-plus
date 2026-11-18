@@ -211,6 +211,30 @@ absorbs the loss) and scrolls itself only in a very short window.
 只有窗口特别矮时才让设置区自己滚动。开关存在 localStorage 的
 dsh-session-top-new.dock 下。
 
+## Bookmarks / 书签
+
+Right-click any session row — in the dock or in the bell — and pick 加入书签. The
+session lands in the 书签 section at the bottom of the panel, one bookmark per
+session (bookmarking again replaces the old entry instead of piling up
+duplicates), and a second right-click on the same row offers 移除书签.
+
+0.3.5 also fixes why the old reply button could look dead. It read the turn's text
+out of the DOM with a markup heuristic; when that heuristic stopped matching, the
+handler returned early and nothing happened at all. The text is now a bonus, not a
+precondition: if the turn cannot be read, the session's own title stands in, so the
+bookmark always saves. The button in the assistant actions row still works and
+still stores the reply it was clicked on — right-clicking is simply the path that
+cannot fail, because it needs nothing but a row's id and title.
+
+书签：在悬浮条或铃铛里右键任意会话行，选「加入书签」，这个会话就会出现在面板底部
+的「书签」区。一个会话只留一条——再次加书签是替换而不是叠加；同一行再右键一次就是
+「移除书签」。
+
+0.3.5 同时修掉了旧书签按钮点了没反应的原因：它靠 DOM 结构猜测去抓那轮回复的正文，
+匹配不上就直接 return，于是什么都不发生。现在正文只是附加信息：读不到就用会话标题
+顶上，书签照样存下来。回复下方那颗按钮仍然可用、也仍然存它所在的那条回复——右键只
+是不依赖 DOM 内容、因此不会失败的那条路。
+
 ## 中文说明
 
 功能一览：
