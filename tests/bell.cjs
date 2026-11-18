@@ -285,6 +285,20 @@ assert.deepEqual(settingsEl.querySelectorAll(".dsb-settings-alert").map((r) => r
 	["任务完成时弹出", "需要选择时弹出"], "each switch is labelled by its own row");
 assert.deepEqual(alertToggles.map((t) => t.attrs.role), ["switch", "switch"]);
 assert.deepEqual(alertToggles.map((t) => t.attrs["aria-checked"]), ["true", "true"], "both nudges fire out of the box");
+// Two layout switches sit above them: keep the host sidebar in step, and show or
+// hide the floating dock (the bell is the only way back once the dock is gone).
+const revealToggle = settingsEl.querySelector("[data-reveal]");
+assert.equal(revealToggle.attrs["aria-checked"], "true", "sidebar reveal is on by default");
+const dockToggle = settingsEl.querySelector("[data-dock]");
+assert.equal(dockToggle.attrs.role, "switch");
+assert.equal(dockToggle.attrs["aria-checked"], "true", "the floating dock is on by default");
+root.dispatchEvent({ type: "click", target: dockToggle });
+assert.equal(dockToggle.attrs["aria-checked"], "false", "the switch flips on click");
+assert.equal(localStorage.getItem("dsh-session-top-new.dock"), "0", "hiding the dock is persisted");
+root.dispatchEvent({ type: "click", target: dockToggle });
+assert.equal(dockToggle.attrs["aria-checked"], "true", "clicking again brings it back");
+assert.equal(localStorage.getItem("dsh-session-top-new.dock"), "1");
+
 assert.equal(source.getSnapshot().unreadCount, 1);
 assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "1", "the bell starts at one");
 assert.match(anchor.button.className, /dsb-unread/, "a live count lights the bell");

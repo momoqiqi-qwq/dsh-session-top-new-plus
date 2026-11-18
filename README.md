@@ -192,6 +192,25 @@ dsh-session-top-new.reveal and is shared by both surfaces, like the theme.
 为了滚一下去改它比什么都不做更糟。开关存在 localStorage 的
 dsh-session-top-new.reveal 下，两个面板共享。
 
+## Hide the dock / 隐藏悬浮条
+
+0.3.4 adds a 悬浮条 switch to the bell's settings. Off, the floating dock is not
+mounted at all — no button, no badge, no drag zone, no hot corner. The bell keeps
+working and lists the same sessions, so nothing is lost; switching it back on puts
+the dock back where you left it (its position is remembered separately).
+
+The same release fixes the dock's own settings block being clipped: it is a column
+flexbox item inside a max-height panel and was shrinking along with the session
+list, so the toggles got cut off mid-row. It now keeps its natural height (the list
+absorbs the loss) and scrolls itself only in a very short window.
+
+悬浮条：铃铛的设置里多一个开关。关掉后悬浮条整个不挂载——没有按钮、没有角标、没有
+拖拽区。铃铛照常工作、列的是同一批会话，不会丢功能；再打开时悬浮条回到原来的位置
+（位置单独记着）。同一版修掉了悬浮条自己的设置区被裁一半的问题：它作为列向 flex
+子项在限高面板里会跟着会话列表一起被压缩，现在固定占自己该占的高度，列表让位；
+只有窗口特别矮时才让设置区自己滚动。开关存在 localStorage 的
+dsh-session-top-new.dock 下。
+
 ## 中文说明
 
 功能一览：
