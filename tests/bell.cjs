@@ -395,7 +395,9 @@ const rowIds = scroll.querySelectorAll("[data-session]").map((r) => r.dataset.se
 assert.deepEqual(rowIds.slice(0, 2).sort(), ["parent", "unread"], "today holds both live conversations");
 assert.equal(rowIds.includes("old"), false, "a session past the day window stays out");
 // A session from late yesterday lands in its own bucket, labelled 昨天.
-const yesterdayRow = { id: "yday", title: "Yesterday", updatedAt: new Date().setHours(0, 0, 0, 0) - 3600000 };
+// One second before today is still yesterday, and always inside the rolling
+// 24h window — a fixed -1h breaks the day window once the clock passes 23:00.
+const yesterdayRow = { id: "yday", title: "Yesterday", updatedAt: new Date().setHours(0, 0, 0, 0) - 1000 };
 dockState = { ...dockState, items: dockState.items.concat([yesterdayRow]) };
 listeners.forEach((fn) => fn());
 assert.deepEqual(scroll.querySelectorAll(".dsb-day").map((h) => h.textContent), ["今天", "昨天"], "yesterday is its own bucket");
@@ -619,15 +621,34 @@ assert.equal(shared.getSnapshot().items[0].running, true);
 assert.equal(bell.getSnapshot().runningCount, 1);
 assert.equal(bell.getSnapshot().items[0].title, "Late service");
 let opened;
-services.uiWorkspace = { openSession(id) { opened = id; } };
+let started = 0;
+services.uiWorkspace = { openSession(id) { opened = id; }, startSession() { started++; } };
 bell.openSession("late");
 assert.equal(opened, "late", "bell jumps via uiWorkspace.openSession");
+// Ctrl+M: New Session in the default (current, else most recent) workspace.
+const ctrlM = { type: "keydown", key: "m", ctrlKey: true };
+ctrlM.preventDefault = () => { ctrlM.prevented = true; };
+document.dispatchEvent(ctrlM);
+assert.equal(started, 1, "Ctrl+M starts a session in the default workspace");
+assert.equal(ctrlM.prevented, true, "the shortcut swallows the browser default");
+document.dispatchEvent({ type: "keydown", key: "M", ctrlKey: true, shiftKey: true, preventDefault() {} });
+assert.equal(started, 1, "Ctrl+Shift+M is not the shortcut");
+document.dispatchEvent({ type: "keydown", key: "m" });
+assert.equal(started, 1, "a bare m is left to the page");
+const composer = new Element("textarea");
+const inField = { type: "keydown", key: "m", ctrlKey: true, target: composer };
+inField.preventDefault = () => { inField.prevented = true; };
+document.dispatchEvent(inField);
+assert.equal(started, 1, "a focused composer keeps Ctrl+M");
+assert.notEqual(inField.prevented, true, "the composer handles its own key");
 effectDisposers.reverse().forEach((fn) => fn());
 assert.equal(registrations.size, 0);
 assert.equal(serviceEvents.size, 0);
 assert.equal(listUnsubscribed, 1);
 assert.equal(statusUnsubscribed, 1);
 assert.equal(frames.size, 0);
+document.dispatchEvent({ type: "keydown", key: "m", ctrlKey: true, preventDefault() {} });
+assert.equal(started, 1, "disposing the plugin unbinds the shortcut");
 // The shipped sidebar root only carries hashed CSS-module classes (wtg9ga_root)
 // and its section header is a plain div, so nothing matches a sidebar-ish
 // selector. The bell must still anchor on the 工作区 row via the document scope.
@@ -687,4 +708,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; inverted auto theme; gear picker; persisted mode");
