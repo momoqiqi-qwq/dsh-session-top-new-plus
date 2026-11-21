@@ -1,3 +1,4 @@
+<!-- 中文速览 — 上游 cuijiajun/dsh-session-top-new 的原始说明存档，只读参考，不在这一版维护。 -->
 # dsh-session-top-new
 
 **Session list too lon
