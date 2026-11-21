@@ -249,7 +249,11 @@ root.className = "dsb-panel";
 const scroll = new Element("div"); scroll.className = "dsb-scroll";
 const settingsEl = new Element("div"); settingsEl.className = "dsb-settings";
 const gearEl = new Element("button"); gearEl.setAttribute("data-settings", "1"); gearEl.setAttribute("aria-expanded", "false");
-root.append(gearEl, settingsEl, scroll); document.body.append(root); refs[0].current = root;
+// The real panel puts the header above the list; the fixture only needs the
+// mark-all-read control that draw() reaches for by attribute.
+const headClear = new Element("button"); headClear.setAttribute("data-clear-unread", "1");
+headClear.textContent = "全部已读";
+root.append(headClear, gearEl, settingsEl, scroll); document.body.append(root); refs[0].current = root;
 const disposePanel = layouts[0]();
 // Visibility is a class so the open/close transition can play; the node never leaves the document.
 assert.match(root.className, /dsb-in/);
@@ -372,20 +376,31 @@ assert.equal(api.countNudges(nudgeRows, "a", { done: true, pick: true }), 3, "wh
 document.dispatchEvent({ type: "keydown", key: "Escape" });
 assert.doesNotMatch(settingsEl.className, /dsb-show/, "first Escape closes the settings row");
 assert.match(root.className, /dsb-in/, "and leaves the panel open");
-assert.match(scroll.textContent, /运行中 \/ Running.*Parent.*未读 \/ Unread.*Unread/);
-assert.doesNotMatch(scroll.textContent, /Child|Old|Blank/);
-// Markers mirror the host: running is a ring, unread is the amber dot, and the
-// disclosure is the filled triangle — not a home-made dot and a text glyph.
+// Day buckets instead of state groups: one header per calendar day, newest day
+// first, and one line per conversation — a parent owns its subagent rows.
+const dayHeads = scroll.querySelectorAll(".dsb-day");
+assert.ok(dayHeads.length >= 1, "the list is bucketed by day");
+assert.equal(dayHeads[0].textContent, "今天", "today leads the list");
+assert.match(scroll.textContent, /Parent/);
+assert.match(scroll.textContent, /Unread/);
+assert.doesNotMatch(scroll.textContent, /Child|Blank/, "subagent rows and blank sessions stay out");
+const rowIds = scroll.querySelectorAll("[data-session]").map((r) => r.dataset.session);
+assert.deepEqual(rowIds.slice(0, 2).sort(), ["parent", "unread"], "today holds both live conversations");
+assert.equal(rowIds.includes("old"), false, "a session past the day window stays out");
+// A session from late yesterday lands in its own bucket, labelled 昨天.
+const yesterdayRow = { id: "yday", title: "Yesterday", updatedAt: new Date().setHours(0, 0, 0, 0) - 3600000 };
+dockState = { ...dockState, items: dockState.items.concat([yesterdayRow]) };
+listeners.forEach((fn) => fn());
+assert.deepEqual(scroll.querySelectorAll(".dsb-day").map((h) => h.textContent), ["今天", "昨天"], "yesterday is its own bucket");
+dockState = { ...dockState, items: dockState.items.filter((it) => it.id !== "yday") };
+listeners.forEach((fn) => fn());
+// Markers mirror the host: unread is the green done dot, a quiet row is dim.
 const marks = scroll.querySelectorAll(".dsb-state");
 assert.ok(marks.length >= 2, "idle and flagged rows share one state-dot slot");
 assert.ok(marks.some((m) => m.dataset.state === "done"), "an unread row is the host's green done dot");
-const disclosure = scroll.querySelector("[data-expand]");
-assert.ok(disclosure.querySelector(".dsb-arrow"), "the triangle lives inside the expand button");
-root.dispatchEvent({ type: "click", target: disclosure });
-assert.match(scroll.textContent, /Child/);
-// The live session is the nested one, so its ring only appears after expanding.
-assert.ok(scroll.querySelector(".dsb-spin"), "a running row draws the rotating ring, not a dot");
-assert.equal(scroll.querySelectorAll(".dsb-state").filter((m) => m.dataset.state === "idle").length >= 1, true);
+assert.ok(marks.filter((m) => m.dataset.state === "idle").length >= 1, "a quiet row keeps the dim dot");
+assert.equal(scroll.querySelector("[data-expand]"), null, "the flat list has no disclosure");
+assert.equal(scroll.querySelector(".dsb-spin"), null, "no top-level session runs in this fixture");
 scroll.scrollTop = 77;
 source.setOpen(false);
 assert.doesNotMatch(root.className, /dsb-in/, "closing only drops the class, leaving the exit transition free to run");
@@ -395,15 +410,16 @@ assert.match(root.className, /dsb-in/);
 assert.equal(scroll.scrollTop, 77);
 assert.equal(stateWrites, 1, "badge/open changes do not re-render the React panel after first mount");
 assert.equal(source.getSnapshot().open, true);
-// Opening a row must clear its unread flag even while the host keeps reporting it,
-// so the session drops out of Unread into Recent on the very click.
-assert.match(scroll.textContent, /未读 \/ Unread[\s\S]*Unread/);
+// Opening a row must clear its unread flag even while the host keeps reporting it:
+// the green dot goes out on the very click that opens the conversation.
+assert.ok(scroll.querySelector("[data-session]"), "the opened row is still on screen");
 assert.equal(source.getSnapshot().unreadCount, 1);
 source.markSeen("unread");
 assert.equal(source.getSnapshot().unreadCount, 0, "opening clears the unread count immediately");
 assert.equal(source.getSnapshot().items.find((it) => it.id === "unread").unread, false);
-assert.doesNotMatch(scroll.textContent, /未读 \/ Unread/, "empty Unread group is skipped");
-assert.match(scroll.textContent, /最近 \/ Recent[\s\S]*Unread/, "opened row is regrouped into Recent");
+assert.equal(scroll.querySelectorAll(".dsb-flagged").length, 0, "the opened row drops its flag");
+assert.equal(scroll.querySelectorAll("[data-session]").length, 2, "the session itself stays listed");
+assert.doesNotMatch(scroll.textContent, /未读 \/ Unread/, "no state groups left to empty");
 assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0", "badge drops on the same click");
 listeners.forEach((fn) => fn());
 assert.equal(source.getSnapshot().items.find((it) => it.id === "unread").unread, false, "host still reporting unread cannot resurrect the row");
@@ -482,7 +498,7 @@ assert.equal(source.getSnapshot().items.some((it) => it.id === "old"), true, "be
 dockState = { items: [], current: null };
 listeners.forEach((fn) => fn());
 source.setOpen(true);
-assert.equal(scroll.textContent, "没有进行中的会话 / No running sessions");
+assert.equal(scroll.textContent, "还没有活动 / No activity yet");
 // The session on screen cannot be unread — you are looking at it — and the rest
 // must be clearable in one go, or Unread is a group you can never empty.
 dockState = { items: [
@@ -494,16 +510,18 @@ let snap = source.getSnapshot();
 assert.equal(snap.items.find((it) => it.id === "watched").unread, false, "the session on screen counts as read");
 assert.equal(snap.items.find((it) => it.id === "other").unread, true, "the one you are not looking at stays unread");
 assert.equal(snap.unreadCount, 1, "only the unseen session nudges");
-assert.match(scroll.textContent, /未读 \/ Unread/);
-const clearBtn = scroll.querySelector("[data-clear-unread]");
-assert.ok(clearBtn, "the Unread header carries a mark-all-read control");
+assert.equal(scroll.querySelectorAll(".dsb-flagged").length, 1, "the unseen row is flagged in place");
+const clearBtn = root.querySelector("[data-clear-unread]");
+assert.ok(clearBtn, "the header carries a mark-all-read control");
 assert.equal(clearBtn.textContent, "全部已读");
+assert.notEqual(headClear.hidden, true, "the control is there while something is unread");
 root.dispatchEvent({ type: "click", target: clearBtn });
 snap = source.getSnapshot();
 assert.equal(snap.unreadCount, 0, "one click clears every unread row");
 assert.equal(snap.items.every((it) => it.unread === false), true);
-assert.doesNotMatch(scroll.textContent, /未读 \/ Unread/, "the header leaves with its group");
+assert.equal(scroll.querySelectorAll(".dsb-flagged").length, 0, "the flag leaves with the row state");
 assert.equal(anchor.button.querySelector(".dsb-badge").textContent, "0", "the badge empties with it");
+assert.equal(headClear.hidden, true, "and the header control leaves with the last unread row");
 // Marking read is not marking answered: a row waiting on a choice keeps asking.
 dockState = { items: [
 	{ id: "finished", title: "Finished", unread: true, updatedAt: Date.now() },
@@ -511,14 +529,14 @@ dockState = { items: [
 ], current: null };
 listeners.forEach((fn) => fn());
 assert.equal(source.getSnapshot().unreadCount, 2);
-const clearAgain = scroll.querySelector("[data-clear-unread]");
+const clearAgain = root.querySelector("[data-clear-unread]");
 assert.ok(clearAgain);
 root.dispatchEvent({ type: "click", target: clearAgain });
 snap = source.getSnapshot();
 assert.equal(snap.items.find((it) => it.id === "finished").unread, false, "the finished row goes quiet");
 assert.equal(snap.items.find((it) => it.id === "ask").pending, true, "the pending row is untouched");
 assert.equal(snap.unreadCount, 1, "a row that still needs an answer keeps nudging");
-assert.ok(scroll.querySelector("[data-clear-unread]"), "and its group header stays");
+assert.ok(root.querySelector("[data-clear-unread]"), "and its group header stays");
 localStorage.removeItem("dsh-session-top-new.days");
 anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
 assert.equal(listeners.size, 0);
