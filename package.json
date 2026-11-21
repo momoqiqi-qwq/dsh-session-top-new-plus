@@ -17,12 +17,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cuijiajun/dsh-session-top-new.git"
+    "url": "git+https://github.com/momoqiqi-qwq/dsh-session-top-new-plus.git"
   },
   "bugs": {
-    "url": "https://github.com/cuijiajun/dsh-session-top-new/issues"
+    "url": "https://github.com/momoqiqi-qwq/dsh-session-top-new-plus/issues"
   },
-  "homepage": "https://github.com/cuijiajun/dsh-session-top-new#readme",
+  "homepage": "https://github.com/momoqiqi-qwq/dsh-session-top-new-plus#readme",
   "keywords": [
     "deepseek",
     "harness",

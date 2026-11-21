@@ -1,308 +1,196 @@
-# dsh-session-top-new
+<div align="center">
 
-**Session list too long to search through? The newest session always buried?**
+<img src="./assets/hero.svg" alt="dsh-session-top-new" width="1000" />
 
-A session overview dock for the **DeepSeek Harness Web GUI**: every session's
-unread and running state in one floating panel, one click to jump to any of
-them, and a chime when one finishes — so the newest and the unread never get
-lost in a long list again.
+**DSH 会话总览 · 中文增强版**
 
-**会话列表越长越难找？最新会话总被淹没？**
+[![stars](https://img.shields.io/github/stars/momoqiqi-qwq/dsh-session-top-new-plus?style=for-the-badge&color=f5c518&labelColor=2b2b2b)](https://github.com/momoqiqi-qwq/dsh-session-top-new-plus/stargazers) ![license](https://img.shields.io/github/license/momoqiqi-qwq/dsh-session-top-new-plus?style=for-the-badge&color=3da639) ![JavaScript](https://img.shields.io/badge/JavaScript-323330?style=for-the-badge&logo=javascript&logoColor=f7df1e) ![DSH](https://img.shields.io/badge/DSH-Web%20GUI-4c8dff?style=for-the-badge)
 
-一个 DSH Web GUI 的会话总览悬浮栏：所有会话的未读与运行状态集中在一个小面板里，
-点一下就能跳过去，会话跑完会响一声——最新和未读的再也不会被长列表埋掉。
+</div>
 
-![Session dock panel](assets/screenshot-panel.png)
+<details open>
+<summary><b>目录</b></summary>
 
-![Collapsed button with unread badge](assets/screenshot-button.png)
+- [可以做什么](#可以做什么)
+- [演示](#演示)
+- [侧栏定位](#侧栏定位)
+- [下载与安装](#下载与安装)
+- [v0.3.5 更新](#v035-更新)
+- [兼容性与当前限制](#兼容性与当前限制)
+- [实现方式](#实现方式)
+- [源码运行与构建](#源码运行与构建)
+- [上游与许可](#上游与许可)
 
-## Features
+</details>
 
-- **Overview, not per-session** — the dock is a global aggregate: you see the
-  state of *all* sessions while you are inside one of them.
-- **Live status, in the host's own language** — rows use the same StateDot the
-  official sidebar uses, with the same precedence: a session waiting on you is
-  amber, a *running* one is the rotating ring (not a dot), a result you have not
-  looked at is a solid green dot, everything else is neutral. The round button
-  carries a red badge counting unread results.
-- **N-day history** — shows sessions updated within the last N days (default:
-  today only). N is editable in the panel header, 1–365.
-- **Click to jump** — clicking a session switches the main view straight to it.
-  The panel stays open.
-- **Parent / child grouping** — subagent sessions nest under their parent and
-  stay collapsed until you expand them, instead of flattening into one list.
-- **Completion chime** — a synthesized two-tone chime (Web Audio, no asset
-  files) plays when a session finishes, with a mute toggle.
-- **Draggable and resize-aware** — drag the button anywhere; the position is
-  stored as a fraction of the window, so it keeps its relative spot when the
-  window is resized. The panel flips up or sideways near a screen edge.
-- **Dismiss a row** — the ✕ that appears on hover hides that row; it comes back
-  by itself once the session produces something newer. Dismissing a parent also
-  hides its currently visible subagent rows.
-- **Inverts the page theme by default** — a light page gets dark chrome and a
-  dark page gets light chrome, so the panel never blends into whatever is behind
-  it. A gear offers 自动 / 浅色 / 深色 if you would rather pin one.
-- **Collapsible** — expands by default; click the button to collapse it back to
-  a single round button.
+---
 
-The dock in both themes — left is a light page, right is a dark one:
+# DSH 会话总览 中文增强版
 
-![Theme inversion preview](assets/theme-preview.png)
+**在侧栏放一颗铃铛，把运行中、未读和最近的会话摆在一起；点一下就跳过去。**
 
-## Sidebar activity bell / 侧栏活动铃铛
+[项目介绍](#可以做什么) · [界面演示](#演示) · [版本记录](https://github.com/momoqiqi-qwq/dsh-session-top-new-plus/commits/main) · [反馈问题](https://github.com/momoqiqi-qwq/dsh-session-top-new-plus/issues)
 
-Version 0.2.0 adds a 28px bell beside the search, filter and new-session
-controls in the left sidebar's Workspace / 工作区 header. It also recognizes
-Sessions / 会话 headers. The red dot breathes while there are unread results;
-the tooltip shows their count. The button follows the host theme and hides
-when the sidebar collapses to its narrow rail.
+> 本仓库是 [cuijiajun/dsh-session-top-new](https://github.com/cuijiajun/dsh-session-top-new) 的二改版本。
+> 上游提供 DSH Web GUI 的会话悬浮条；这一版在它上面加了侧栏活动铃铛、
+> 铃铛面板、主题与免打扰设置、侧栏定位、右键书签等一层中文向的增强。
+> 插件 id 与包名仍是 `dsh-session-top-new`，与上游同一身份，装的就是同一个插件。
+> 保留上游 MIT 许可与版权，未改动上游的许可证声明；上游原始说明见 [README.upstream.md](README.upstream.md)。
 
-Click the bell to open a 320px activity panel grouped as **Running / 运行中**,
-**Unread / 未读**, then **Recent / 最近**. Child sessions stay nested and
-collapsed until expanded; a child's activity promotes its parent group.
-Click a session to jump to it. Opening an unread session clears its flag on
-the spot, so the row leaves Unread and lands in Recent the moment you click
-it — even while the host is still reporting it unread. The session on screen
-is never unread (you are looking at it), and the Unread header carries a
-small **全部已读 / mark all read** control, so the whole group can be emptied
-in one click instead of one row at a time. Rows waiting on a choice stay:
-they are asking for an answer, not for attention. Escape or a click outside
-closes the panel.
+DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些」就一起沉下去了。
+这个插件不重做侧栏，只在「工作区」标题行加一颗铃铛：
+点开是运行中 / 未读 / 最近三段，行首标识与官方侧栏同一套，
+点任意一条直接切过去；不想用铃铛，原来的悬浮条照旧。
 
-The panel grows out of the bell: 190ms scale-and-fade on the way in, 130ms
-fade back towards it on the way out, with the transform origin following the
-flip side so it always leaves from the edge nearest the button. The bell
-nudges 12° while the panel is open, presses to 0.9 scale, and the unread dot
-pops in before it starts breathing. Panel visibility is a CSS state rather
-than the hidden attribute, so the exit animation finishes instead of being
-cut off; prefers-reduced-motion drops the transforms and keeps a short fade.
-The list uses the floating dock's N-day setting. The floating dock, its
-bookmarks, dragging, dismissal controls and completion chime remain available.
-The bell shares the dock's snapshot and never plays a second chime.
+## 可以做什么
 
-DSH exposes no public actions slot in the sidebar header. The plugin therefore
-injects only the button into the header DOM and registers the panel as a second
-`shell.overlay` entry, `dsh-session-top-new-bell`. It never replaces
-`sidebar.workspaces`. The shipped sidebar root only carries hashed CSS-module
-classes (`wtg9ga_root`) and its section header is a plain `div`, so no stable
-attribute selector matches it: the plugin looks for the `工作区 / Workspaces`
-(or `会话 / Sessions`) label, climbs to the row that holds two to eight
-controls, and inserts the button immediately before the search control. When no
-scoped container matches, that search falls back to the document. Header markup
-can change between DSH releases. If a reliable title or search-control row
-cannot be found, the plugin logs one warning and leaves the floating dock as
-the entry point.
+- **侧栏一颗铃铛**：挂在「工作区 / Workspace」标题行，与搜索、筛选、新建同排，
+  有未读时角标呼吸，侧栏收成窄轨时自动隐藏。
+- **三段活动视图**：运行中 / 未读 / 最近分开列，子会话折叠在父会话下，需要时再展开。
+  运行中的行是转圈，等你选择的行是琥珀点，结果没看过的行是实心点——和官方侧栏的判断顺序一致。
+- **未读就是没看过**：点开某条会话的那一刻它就从「未读」掉到「最近」，
+  不必等宿主自己把标记清掉；子会话有新动静会把父会话一起顶上来。
+- **一键全部已读**：「未读」标题右边的「全部已读」把整组清空，不用一行一行点。
+- **侧栏定位**：跳转之后，官方左侧边栏会滚到这条会话所在的行。细节见 [侧栏定位](#侧栏定位)。
+- **主题自动反色**：浅色页面配深色面板、深色页面配浅色面板，默认跟随页面；
+  齿轮里可以固定成自动 / 浅色 / 深色，固定后就不再随页面跳。
+- **免打扰**：「任务完成时弹出」「需要选择时弹出」两个开关，各自独立，关掉的只是那一种提醒。
+- **悬浮条可整块关掉**：铃铛设置里关掉「悬浮条」，那颗悬浮按钮就不再挂载——没有按钮、没有角标、没有拖拽区；
+  铃铛列的仍是同一批会话，功能不丢，再打开时回到原来的位置。
+- **右键加书签**：在悬浮条或铃铛里右键任意会话行选「加入书签」，它会进面板底部的书签区；
+  一个会话只留一条，再次右键就是「移除书签」。这条路只依赖会话的 id 与标题，不猜 DOM，所以不会点不动。
+- **沿用上游的悬浮条**：圆形按钮可拖到任意位置并按窗口比例记忆、近 N 天窗口（1–365）、
+  父子折叠、悬停 ✕ 忽略该行（有新记录时自己回来）、贴边时面板朝另一侧展开、
+  会话跑完响一声（Web Audio 合成，可静音）。
 
-Performance guards: one `MutationObserver` watches the anchor subtree — the
-sidebar when a scoped element matched, otherwise the document — with an
-immediate return while the button remains anchored. Header replacements
-coalesce into one animation-frame lookup, with no layout reads in the mutation
-callback and no anchor polling. Failed lookups back off from 400 ms to 8 s, so a
-collapsed sidebar or a streaming turn cannot turn into a per-frame document
-scan; the backoff is state rather than a timer, so an idle page schedules
-nothing. Badge changes update DOM text and classes
-directly. The panel's contents mount lazily on the first open and remain hidden
-on close, preserving their scroll position and subscriptions. Rows stay within
-the dock's N-day window and are replaced through a `DocumentFragment` only when
-the snapshot changes. Unloading disconnects observers and removes the injected
-button, its stylesheet, panel hooks and shared data subscriptions.
+## 演示
 
-侧栏铃铛位于「工作区 / Workspace」标题旁，与搜索、筛选和新建会话按钮同排。
-点击查看运行中、未读及最近会话，子会话默认折叠，点击条目即可跳转。
-按 Escape 或点击面板外关闭，再次打开会保留滚动位置。侧栏收窄时自动隐藏。
-表头没有公共插槽，因此按钮采用 DOM 注入；宿主升级若改变表头结构，可能需要
-适配。找不到可靠位置时只警告一次，仍可使用原有悬浮窗。
+### 铃铛面板
 
-### Row markers / 行首标识
+<img src="./assets/demo-bell.png" alt="侧栏铃铛的活动面板" width="392" />
 
-The row leading mark is a copy of the host's, not a look-alike:
+深色页面上的浅色面板。运行中的行在转圈，等你选择的行是琥珀点，
+「未读」右边的「全部已读」一次清空；子会话默认折叠，展开时缩进在父会话下面。
 
-| State | Mark | Source of truth |
-| --- | --- | --- |
-| waiting on you | amber dot | `StateDot` `warning` |
-| running | 14px rotating ring + breathing arc | `StateDot` `ongoing` |
-| finished, not opened | green dot | `StateDot` `done` |
-| idle | neutral dot at 50% | `StateDot` `idle` |
+### 铃铛设置
 
-Geometry follows the host exactly: a 10px slot painting a 6px core through
-`inset: 20%` and `currentColor`; the ring is a 24-unit viewBox with two `r 9.5`
-circles, a 25%-opacity track and a `12 150` → `24 150` dash cycle over 1.5s. The
-disclosure chevron is also the host's filled triangle (`0 0 16 16`), rotated 90°
-by CSS so opening animates instead of swapping glyphs. Reduced-motion disables
-both the spin and the rotation, leaving the arc as a static 18-unit segment.
+<img src="./assets/demo-settings.png" alt="铃铛的齿轮设置：主题、侧栏定位、悬浮条与两个免打扰开关" width="392" />
 
-Deliberate consequence: "running" is no longer green. Green belongs to
-*finished and unread* — that is the host's meaning, and matching it is the whole
-point of this section.
+齿轮里是这一版的全部开关：界面主题（自动 / 浅色 / 深色）、侧栏定位、悬浮条、
+任务完成时弹出、需要选择时弹出。
 
-## Theme settings / 主题设置
+### 悬浮条
 
-Version 0.3.0 adds a gear at the right of both panel headers (the sidebar bell
-panel and the floating dock). It opens a 自动 / 浅色 / 深色 row; the choice is
-shared by both surfaces and persists in localStorage under
-dsh-session-top-new.theme.
+<img src="./assets/demo-dock.png" alt="悬浮的会话条：标题行、近 N 天、会话列表、书签区和底部计数" width="400" />
 
-**自动 is the inversion,** not the page's own colour: on a light page the panels
-are dark, on a dark page they are light. That keeps the chrome from blending
-into the surface behind it, which is the reason the plugin inverts in the first
-place. It watches body[data-ds-dark-theme] (falling back to a data-color-scheme
-or data-theme hint, then prefers-color-scheme), so flipping DSH's own theme
-switches the panels at the same moment. 浅色 and 深色 pin the palette and ignore
-the page.
+上游那颗悬浮条仍然在：标题行带「近 N 天」、静音与齿轮，下面是会话列表与书签区，
+底部是「几个进行中 · 几个未读结果」。
 
-Each surface paints from its own data-dsb-theme attribute and a small set of CSS
-variables (--dsb-surface, --dsb-label, --dsb-active and friends), so the panel
-never depends on host tokens that a theme switch could leave stale. Escape
-closes the settings row before it closes the panel.
+### 右键书签
 
-### Motion / 动效
+<img src="./assets/demo-bookmark.png" alt="在会话行上右键弹出的加入书签菜单" width="400" />
 
-0.3.1 makes the gear feel like a button and the row feel like it belongs to it:
-the gear turns 90° and fills in when open, scales down on press, and settles on
-hover; the settings row unfolds from a 0fr grid track (240ms) instead of
-appearing; the three modes share a sliding thumb (240ms, one element moving
-under the labels) rather than three buttons swapping backgrounds; the panel
-cross-fades its colours (220ms) when you pick a mode, and the hint on the right
-of the row spells out what 自动 resolved to right now. All of it is transform
-and opacity only, and prefers-reduced-motion keeps just the cross-fade.
+右键任意会话行，一个菜单、一个动作。书签按会话去重，重复加是替换。
 
-主题设置：两个面板右上角的齿轮打开「自动 / 浅色 / 深色」，选择由两个面板共享，
-并保存在 localStorage 的 dsh-session-top-new.theme 下。**自动 = 与页面反色**
-（浅色页配深色面板，深色页配浅色面板），跟随 DSH 主题开关同步切换；浅色与深色
-则固定配色、忽略页面。
+## 侧栏定位
 
-## Reveal in sidebar / 侧栏定位
+DSH 官方侧栏的会话树可能很长。你在铃铛面板或悬浮条里点一条会话，主视图切换过去之后，
+左侧边栏原本停在别处——那一条还是看不见。这个开关补的就是这一步：
+**跳转之后，官方侧栏会滚到这条会话所在的行，把它带到可见位置。**
 
-0.3.3 adds a 侧栏定位 switch under the theme row, in both panels. On by default.
-With it on, clicking a session here (bell or dock) does two things in order: the
-session opens, then the host sidebar scrolls so that session's own row is on
-screen — the same `scrollIntoView({ block: 'nearest' })` the shipped rows use
-themselves, aimed at their `data-row-key="session:<id>"` marker. Off, only the
-session opens and the sidebar stays where you left it.
+- 位置：铃铛的齿轮设置 →「侧栏定位」，默认开启。
+- 关掉之后：只切会话，侧栏不动。
+- 状态存在 `localStorage` 的 `dsh-session-top-new.reveal` 下，悬浮条和铃铛共享同一个值。
+- 边界：**只滚动，不展开折叠的项目分组**。那棵树是你自己摆的，为了滚一下去改它，比什么都不做更糟。
+  找不到对应行时静默不动，不报错。
 
-The plugin never expands a collapsed project group to reach a row that is not
-mounted: that tree belongs to you, and silently reshaping it to satisfy a scroll
-would be worse than doing nothing. The preference lives in localStorage under
-dsh-session-top-new.reveal and is shared by both surfaces, like the theme.
+## 下载与安装
 
-侧栏定位：两个面板的主题行下面多一个开关，默认开启。开启后点这里的会话（铃铛或
-悬浮条）会先切到该会话，再把左侧边栏滚到它自己那一行——用的是官方行自己也在用的
-`scrollIntoView({ block: 'nearest' }`），定位靠官方行的 `data-row-key="session:<id>"`
-标记。关闭后只切会话，侧栏不动。**不会替你展开折叠的项目分组**：那棵树的状态归你，
-为了滚一下去改它比什么都不做更糟。开关存在 localStorage 的
-dsh-session-top-new.reveal 下，两个面板共享。
-
-## Hide the dock / 隐藏悬浮条
-
-0.3.4 adds a 悬浮条 switch to the bell's settings. Off, the floating dock is not
-mounted at all — no button, no badge, no drag zone, no hot corner. The bell keeps
-working and lists the same sessions, so nothing is lost; switching it back on puts
-the dock back where you left it (its position is remembered separately).
-
-The same release fixes the dock's own settings block being clipped: it is a column
-flexbox item inside a max-height panel and was shrinking along with the session
-list, so the toggles got cut off mid-row. It now keeps its natural height (the list
-absorbs the loss) and scrolls itself only in a very short window.
-
-悬浮条：铃铛的设置里多一个开关。关掉后悬浮条整个不挂载——没有按钮、没有角标、没有
-拖拽区。铃铛照常工作、列的是同一批会话，不会丢功能；再打开时悬浮条回到原来的位置
-（位置单独记着）。同一版修掉了悬浮条自己的设置区被裁一半的问题：它作为列向 flex
-子项在限高面板里会跟着会话列表一起被压缩，现在固定占自己该占的高度，列表让位；
-只有窗口特别矮时才让设置区自己滚动。开关存在 localStorage 的
-dsh-session-top-new.dock 下。
-
-## Bookmarks / 书签
-
-Right-click any session row — in the dock or in the bell — and pick 加入书签. The
-session lands in the 书签 section at the bottom of the panel, one bookmark per
-session (bookmarking again replaces the old entry instead of piling up
-duplicates), and a second right-click on the same row offers 移除书签.
-
-0.3.5 also fixes why the old reply button could look dead. It read the turn's text
-out of the DOM with a markup heuristic; when that heuristic stopped matching, the
-handler returned early and nothing happened at all. The text is now a bonus, not a
-precondition: if the turn cannot be read, the session's own title stands in, so the
-bookmark always saves. The button in the assistant actions row still works and
-still stores the reply it was clicked on — right-clicking is simply the path that
-cannot fail, because it needs nothing but a row's id and title.
-
-书签：在悬浮条或铃铛里右键任意会话行，选「加入书签」，这个会话就会出现在面板底部
-的「书签」区。一个会话只留一条——再次加书签是替换而不是叠加；同一行再右键一次就是
-「移除书签」。
-
-0.3.5 同时修掉了旧书签按钮点了没反应的原因：它靠 DOM 结构猜测去抓那轮回复的正文，
-匹配不上就直接 return，于是什么都不发生。现在正文只是附加信息：读不到就用会话标题
-顶上，书签照样存下来。回复下方那颗按钮仍然可用、也仍然存它所在的那条回复——右键只
-是不依赖 DOM 内容、因此不会失败的那条路。
-
-## 中文说明
-
-功能一览：
-
-- 圆形按钮可**拖拽**到任意位置，窗口缩放时按比例跟随
-- 「近 N 天」可自定义（默认当天）
-- 运行中显示绿色脉冲点，未查看结果显示琥珀点，按钮红色角标显示未读数
-- 子任务折叠在主任务下，不平铺
-- 点击会话直接跳转，面板不自动收起
-- 鼠标悬停行尾出现 **×**：忽略该记录，等这个会话有新记录时自动重新出现
-  （忽略主任务会同时忽略它当前显示的子任务）
-- 配色**反色于页面主题**：浅色主题下用深色外壳、深色主题下用浅色外壳，跟随
-  DSH 的主题开关自动切换，无需设置，任何时候都清晰可辨
-- 结束提示音使用 Web Audio 合成，无需音频文件，可静音
-
-## Install
+要求：DSH Web GUI（`web` profile）。
 
 ```bash
-dsh plugin --profile web add github:cuijiajun/dsh-session-top-new
+dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 ```
 
-Install from source builds the package once, so the first install asks for the
-usual build approval.
+装完 **重启 Web GUI**：客户端模块扫描会按启动缓存判定结果，新装的插件要重启才出现。
+从源码安装时第一次会请求构建许可，照常确认即可。
 
-Then **restart the Web GUI** — the client-modules scan caches package verdicts
-per boot, so a newly installed plugin only appears after a restart.
+升级同一个插件（在上游与本仓库之间切换也一样）：
 
-## Layout
-
-```
-dsh.plugin.json     plugin manifest (id / version / main / engines)
-cordis.patch.yml    bundle patch: mounts the host plugin row
-lib/index.js        host entry (no-op; exists so the bundle mounts)
-lib/client.js       dock + sidebar bell: __ModuleLoader__ bundle (no build step)
-assets/             screenshots
-screenshots.json    storefront screenshot list
+```bash
+dsh plugin --profile web remove dsh-session-top-new
+dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 ```
 
-## How it works
+## v0.3.5 更新
 
-The dock registers a root-scope `shell.overlay` entry, so it floats above the
-whole app regardless of panel or session. It reads two client services and
-keeps only the leaf fields it renders:
-
-| Purpose | Source |
+| 版本 | 内容 |
 | --- | --- |
-| Session list and metadata | `sessions.list` — `ids`, `byId[id]` with `displayTitle`, `running`, `updatedAt`, `parentId`, `origin`, `retainedBy.mainView` |
-| Running / unread state | `uiSession.sessionStatus` — `{ running, pendingInteraction, completionUnread }` |
-| Jump to a session | `uiWorkspace.openSession(id)` |
+| 0.3.5 | 右键会话加书签；修掉旧书签按钮「点了没反应」（不再靠 DOM 猜正文，读不到就用会话标题顶上） |
+| 0.3.4 | 铃铛设置里新增「悬浮条」开关；修掉悬浮条设置区被列表压扁、开关被裁一半的问题 |
+| 0.3.3 | 侧栏定位：跳转后官方侧栏滚到对应会话 |
+| 0.3.2 | 行首标识与官方侧栏完全对齐（运行中、等你选择、未读结果、普通） |
+| 0.3.1 | 齿轮与主题行的动效，让设置读起来像长在面板里而不是贴上去的 |
+| 0.3.0 | 齿轮控制浅色 / 深色主题，默认自动反色 |
+| 0.2.1 | 打开某条会话的那一刻把它移出「未读」 |
+| 0.2.0 | 侧栏「工作区」标题行加活动铃铛；运行中 / 未读 / 最近三段面板；全部已读 |
 
-The `dock` observable subscribes to both sources, extracts a flat snapshot of
-scalars, and hands both surfaces a referentially stable object. The bell derives
-its counts and list from that source without subscribing to host services again.
-A `running →
-finished` transition (or a new `completionUnread` flag) triggers the chime,
-respecting the mute toggle.
+## 兼容性与当前限制
 
-## Compatibility
+- 只针对 **DSH Web GUI**。桌面端与 CLI 没有这套侧栏。
+- 插件读的是官方 UI 自己也在用的客户端服务：`sessions.list`、`uiSession.sessionStatus`、
+  `uiWorkspace.openSession`。它们不是冻结的公开 API，Harness 升级可能改名或改结构；
+  真出问题时，控制台里会有一条 `[dsh-session-top-new]` 警告，而不是静默失效。
+- 侧栏表头没有对外暴露的插槽（Slots 里没有 header actions 这一项），所以铃铛是**注入**进表头 DOM 的：
+  找「工作区 / Workspace」（或「会话 / Sessions」）标签，往上找到同时放着几个控件的那一行，插在搜索控件之前。
+  宿主改版换了表头结构时可能失配；失配只警告一次，悬浮条仍然可用。
+- 侧栏定位只滚动、不展开折叠分组（见上文）。
+- 面板与悬浮条的位置、主题、各开关状态存在 `localStorage`，跟着这台浏览器走。
+- 测试针对 2026 年 10–11 月的 DSH 构建。
 
-This plugin talks to the DSH **client runtime services** named above. They are
-the interfaces the official UI itself uses, but they are not a frozen public
-API, so a Harness upgrade may rename or restructure them. When that happens the
-dock can lose its click-to-jump or status markers until the plugin is updated —
-if a control stops responding, check the browser console for a
-`[dsh-session-top-new]` warning, which is emitted instead of failing silently.
+## 实现方式
 
-Tested against DSH builds current as of October 2026.
+| 用途 | 来源 |
+| --- | --- |
+| 会话列表与元数据 | `sessions.list`（`displayTitle`、`running`、`updatedAt`、`parentId`、`retainedBy.mainView`） |
+| 运行中 / 未读状态 | `uiSession.sessionStatus`（`running`、`pendingInteraction`、`completionUnread`） |
+| 跳到某条会话 | `uiWorkspace.openSession(id)` |
+| 侧栏行定位 | 官方侧栏 DOM 中的会话行（按 id 匹配后 `scrollIntoView`） |
 
-## License
+两个界面共用一份快照：`dock` 订阅上面两个数据源，抽出一层只含标量的扁平结构，
+再交给悬浮条与铃铛；铃铛自己不再订阅宿主服务，只从这份快照里算分组和计数。
+面板注册为第二个 `shell.overlay` 条目（`dsh-session-top-new-bell`），
+**不替换** `sidebar.workspaces` 那块官方 UI。整个客户端 bundle 是手写的，没有构建步骤。
 
-MIT
+## 源码运行与构建
+
+没有构建步骤，也没有运行时依赖需要安装：`lib/client.js` 是一份手写的 `__ModuleLoader__` bundle，
+`require("react")` 也只用到 `React.createElement`。
+
+```bash
+git clone https://github.com/momoqiqi-qwq/dsh-session-top-new-plus
+cd dsh-session-top-new-plus
+node --check lib/client.js     # 语法
+node tests/bell.cjs            # 生命周期、设置项与右键书签的断言（自带 DOM 替身，不需要浏览器）
+```
+
+文件结构：
+
+```
+dsh.plugin.json     插件清单（id / version / main / engines）
+cordis.patch.yml    bundle 补丁：挂载宿主插件行
+lib/index.js        宿主入口（no-op，存在是为了让 bundle 能挂上）
+lib/client.js       悬浮条 + 侧栏铃铛：__ModuleLoader__ bundle（无构建）
+tests/bell.cjs      节点断言，自带 DOM 替身
+assets/             演示图与 hero
+screenshots.json    上架用的截图清单
+```
+
+## 上游与许可
+
+本仓库是社区二改版，与上游独立发行。上游 [cuijiajun/dsh-session-top-new](https://github.com/cuijiajun/dsh-session-top-new)
+提供了整套悬浮条与它的数据层，这一版的所有增强都长在它上面——谢谢原作者。
+两边都遵循 [MIT License](LICENSE)，保留原作者的版权声明；上游原始说明见 [README.upstream.md](README.upstream.md)。
+
+遇到问题请提到[本仓库的 issues](https://github.com/momoqiqi-qwq/dsh-session-top-new-plus/issues)，
+上游行为本身的问题也可以直接找 [上游](https://github.com/cuijiajun/dsh-session-top-new/issues)。
