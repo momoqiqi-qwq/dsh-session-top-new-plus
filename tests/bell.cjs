@@ -1,3 +1,10 @@
+/**
+ * 中文速览 — 铃铛面板的节点断言，自带 DOM 替身，不需要浏览器。
+ *   跑：node tests/bell.cjs（零依赖，全绿会打出一串 PASS: ...）。
+ *   React 替身只建 { type, props }，不建 DOM：面板根节点、头部按钮这类由 React
+ *   生成的元素要在 fixture 里手工搭出来（见 root.append(...) 那段）。
+ *   断言锚点一律用 data-* 属性，不要靠 class 名或界面文案。
+ */
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
