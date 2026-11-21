@@ -1,6 +1,7 @@
 # 中文速览 — 只忽略本机产物：依赖目录、日志、系统垃圾、npm 登录票据。
 # assets/ 里的演示图是要进仓库的，别在这里忽略 png。
 node_modules/
+tmp/
 *.log
 .DS_Store
 Thumbs.db
