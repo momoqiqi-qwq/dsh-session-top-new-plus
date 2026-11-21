@@ -197,9 +197,30 @@ cordis.patch.yml    bundle 补丁：挂载宿主插件行
 lib/index.js        宿主入口（no-op，存在是为了让 bundle 能挂上）
 lib/client.js       悬浮条 + 侧栏铃铛：__ModuleLoader__ bundle（无构建）
 tests/bell.cjs      节点断言，自带 DOM 替身
+scripts/publish-market.mjs  往插件市场目录提条目（fork → 分支 → PR → 盯 CI）
 assets/             演示图与 hero
 screenshots.json    上架用的截图清单
 ```
+
+## 发布到插件市场
+
+市场目录是 [awesome-dsh-plugin/awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)：
+一次投稿 = 在 `data/plugins/` 下加一个 `<owner>__<repo>.yml`，README 由那边的 CI 合并后重新生成，
+不用手改。它的 CI 会查三件事——`package.json` 里有没有 `dsh.bundle`（只有 `dsh.client` 装不上）、
+仓库有没有打 `dsh-plugin` topic、**仓库是否创建满 1 天**。
+
+本仓库的创建时间是 2026-11-21T03:18:27Z，所以满一天的时间点是 **2026-11-22 11:18（+08:00）**。
+到点之后跑：
+
+```bash
+node scripts/publish-market.mjs            # 预检 → fork → 建分支写条目 → 开 PR → 盯 CI
+node scripts/publish-market.mjs --dry-run  # 只打印将要发的请求和 PR 正文，什么都不写
+```
+
+脚本自己清掉 `HTTP_PROXY` 那套环境变量（本机系统代理常常没起），token 取 `gh auth token`。
+每次运行在 `tmp/market-publish/<时间戳>/` 留 `stdout.log`、`events.jsonl` 和 `result.json`；
+PR 号存在 `tmp/market-publish/state.json`，中断后重跑会接着盯同一个 PR，不会重复开。
+退出码：`0` 正常（含 checks 失败）、`2` 预检不过、`3` 仓库还不到 1 天、`4` API 出错、`5` 盯到超时还没结论。
 
 ## 提交信息
 
