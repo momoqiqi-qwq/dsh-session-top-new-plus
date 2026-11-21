@@ -1,3 +1,8 @@
+<!--
+  中文速览 — 这是主说明：顶部横幅 + 一句话定位 + 可以做什么 + 四组演示图 +
+  侧栏定位 + 下载安装 + 版本表 + 实现方式 + 提交信息约定。
+  上游原始说明另存 README.upstream.md，两份都保留；改演示图时同步 screenshots.json。
+-->
 <div align="center">
 
 <img src="./assets/hero.svg" alt="dsh-session-top-new" width="1000" />
@@ -195,6 +200,23 @@ tests/bell.cjs      节点断言，自带 DOM 替身
 assets/             演示图与 hero
 screenshots.json    上架用的截图清单
 ```
+
+## 提交信息
+
+文件列表里每个名字旁边那句说明，就是它最近一次提交的信息；所以这里的提交都写成
+「一句话说清这个文件是干什么的」，而不是「更新了一些东西」。
+
+| 前缀 | 用在 |
+| --- | --- |
+| ⭐ `feat(scope):` | 加功能 |
+| 🐍 `fix(scope):` | 修 bug |
+| 📄 `docs(scope):` | 文档、演示图、市场条目 |
+| 🧪 `test(scope):` | 测试 |
+| 🔧 `chore(scope):` | 仓库配置、依赖、脚本 |
+| 🚀 `release:` | 发版本 |
+
+`scope` 用 `client`（界面逻辑）、`bell`（侧栏铃铛）、`dock`（悬浮条）、`readme`、`host`（宿主入口）。
+说明用中文写这个文件是什么、改它要注意什么；一句话讲不完就说明该拆文件了。
 
 ## 上游与许可
 
