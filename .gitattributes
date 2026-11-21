@@ -1,2 +1,3 @@
+# 中文速览 — 换行统一 LF（在 Windows 上编辑也不会带进 CRLF），png 按二进制处理。
 * text=auto eol=lf
 *.png binary
