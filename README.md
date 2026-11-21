@@ -20,7 +20,7 @@
 - [演示](#演示)
 - [侧栏定位](#侧栏定位)
 - [下载与安装](#下载与安装)
-- [v0.3.6 更新](#v036-更新)
+- [v0.3.7 更新](#v037-更新)
 - [兼容性与当前限制](#兼容性与当前限制)
 - [实现方式](#实现方式)
 - [源码运行与构建](#源码运行与构建)
@@ -58,6 +58,8 @@ DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些
   不必等宿主自己把标记清掉；子会话有新动静会把父会话一起顶上来。
 - **一键全部已读**：面板标题行右边的「全部已读」一次清空，一条未读都没有时它自己收起来。
 - **侧栏定位**：跳转之后，官方左侧边栏会滚到这条会话所在的行。细节见 [侧栏定位](#侧栏定位)。
+- **Ctrl+M 开新会话**：任意位置按 `Ctrl+M`（macOS 上 `Cmd+M`），就在当前文件夹开一个新会话，
+  和官方「新建会话」按钮同一个动作。焦点在输入框里时它不抢这个键——那里 `Ctrl+M` 等同回车，会把没写完的话发出去。
 - **主题自动反色**：浅色页面配深色面板、深色页面配浅色面板，默认跟随页面；
   齿轮里可以固定成自动 / 浅色 / 深色，固定后就不再随页面跳。
 - **免打扰**：「任务完成时弹出」「需要选择时弹出」两个开关，各自独立，关掉的只是那一种提醒。
@@ -135,10 +137,11 @@ dsh plugin --profile web remove dsh-session-top-new
 dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 ```
 
-## v0.3.6 更新
+## v0.3.7 更新
 
 | 版本 | 内容 |
 | --- | --- |
+| 0.3.7 | `Ctrl+M` 在当前文件夹开新会话（输入框聚焦时不拦）；顺手修掉一条按天分组测试在 23 点后会假失败的时间窗问题 |
 | 0.3.6 | 面板改成按天分组（今天 / 昨天 / 一周内按星期 / 更早按日期）；角标从圆点改成红色数字，超过 99 显示 `99+`；「全部已读」挪到面板标题行，一条未读都没有时自己收起 |
 | 0.3.5 | 右键会话加书签；修掉旧书签按钮「点了没反应」（不再靠 DOM 猜正文，读不到就用会话标题顶上） |
 | 0.3.4 | 铃铛设置里新增「悬浮条」开关；修掉悬浮条设置区被列表压扁、开关被裁一半的问题 |
@@ -153,7 +156,7 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 
 - 只针对 **DSH Web GUI**。桌面端与 CLI 没有这套侧栏。
 - 插件读的是官方 UI 自己也在用的客户端服务：`sessions.list`、`uiSession.sessionStatus`、
-  `uiWorkspace.openSession`。它们不是冻结的公开 API，Harness 升级可能改名或改结构；
+  `uiWorkspace.openSession`、`uiWorkspace.startSession`。它们不是冻结的公开 API，Harness 升级可能改名或改结构；
   真出问题时，控制台里会有一条 `[dsh-session-top-new]` 警告，而不是静默失效。
 - 侧栏表头没有对外暴露的插槽（Slots 里没有 header actions 这一项），所以铃铛是**注入**进表头 DOM 的：
   找「工作区 / Workspace」（或「会话 / Sessions」）标签，往上找到同时放着几个控件的那一行，插在搜索控件之前。
@@ -169,6 +172,7 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 | 会话列表与元数据 | `sessions.list`（`displayTitle`、`running`、`updatedAt`、`parentId`、`retainedBy.mainView`） |
 | 运行中 / 未读状态 | `uiSession.sessionStatus`（`running`、`pendingInteraction`、`completionUnread`） |
 | 跳到某条会话 | `uiWorkspace.openSession(id)` |
+| 开新会话（`Ctrl+M`） | `uiWorkspace.startSession()`——不带参数就落在当前 / 最近的工作区，与官方按钮同一条路 |
 | 按天分组 | 本地按 `updatedAt` 分桶：今天 / 昨天 / 一周内星期名 / 更早 `MM-DD`（跨年带年份） |
 | 侧栏行定位 | 官方侧栏 DOM 中的会话行（按 id 匹配后 `scrollIntoView`） |
 
