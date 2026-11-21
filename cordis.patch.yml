@@ -1,3 +1,5 @@
+# 中文速览 — bundle 补丁：往宿主插件表插一行，把 dsh-session-top-new 挂上去。
+# id 与 name 必须和 dsh.plugin.json 的 id、包名一致，否则客户端模块扫描找不到它。
 # dsh-session-top-new bundle patch: mount the host plugin under its package name.
 - insert:
     - id: dsh-session-top-new
