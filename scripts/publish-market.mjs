@@ -169,6 +169,19 @@ async function ensureFork() {
 }
 
 // ---------- 写文件 + 开 PR ----------
+async function writeEntry(branch, entry) {
+  const probe = await api('GET', '/repos/' + OWNER + '/' + FORK_REPO + '/contents/' + ENTRY_PATH + '?ref=' + encodeURIComponent(branch));
+  const payload = {
+    message: (probe.ok ? 'Update' : 'Add') + ' plugin: ' + OWNER + '/' + REPO + ' (' + CATEGORY + ')',
+    content: Buffer.from(entry, 'utf8').toString('base64'),
+    branch,
+  };
+  if (probe.ok && probe.json && probe.json.sha) payload.sha = probe.json.sha;
+  const put = await api('PUT', '/repos/' + OWNER + '/' + FORK_REPO + '/contents/' + ENTRY_PATH, payload);
+  if (put.ok) log('entry ' + (payload.sha ? 'updated' : 'created') + ' at ' + put.json.content.path + ' (' + payload.message + ')');
+  return put;
+}
+
 async function submit(entry) {
   if (DRY) {
     log('DRY: would create branch ' + BRANCH + ' from fork main');
@@ -195,13 +208,8 @@ async function submit(entry) {
   if (!ref.ok && ref.status !== 422) throw new Error('create branch: HTTP ' + ref.status + ' ' + JSON.stringify(ref.json).slice(0, 300));
   log('branch ' + BRANCH + ' ready (HTTP ' + ref.status + ')');
 
-  const put = await api('PUT', '/repos/' + OWNER + '/' + FORK_REPO + '/contents/' + ENTRY_PATH, {
-    message: 'Add plugin: ' + OWNER + '/' + REPO + ' (' + CATEGORY + ')',
-    content: Buffer.from(entry, 'utf8').toString('base64'),
-    branch: BRANCH,
-  });
+  const put = await writeEntry(BRANCH, entry);
   if (!put.ok) throw new Error('write entry: HTTP ' + put.status + ' ' + JSON.stringify(put.json).slice(0, 300));
-  log('entry written at ' + put.json.content.path);
 
   const body = prBody();
   const pr = await api('POST', '/repos/' + UPSTREAM + '/pulls', {
@@ -310,6 +318,11 @@ async function main() {
     saveState({ pr: prNumber, url: sub.pr.html_url, branch: BRANCH, entry: ENTRY_PATH });
   } else {
     log('resuming with existing PR #' + prNumber);
+    if (flag('push-update')) {
+      if (DRY) { log('DRY: would PUT updated entry to ' + BRANCH); return 0; }
+      const put = await writeEntry(BRANCH, entry);
+      if (!put.ok) throw new Error('update entry: HTTP ' + put.status + ' ' + JSON.stringify(put.json).slice(0, 300));
+    }
   }
 
   if (STAGE === 'submit') { log('stage submit only, PR #' + prNumber); return 0; }
