@@ -20,7 +20,7 @@
 - [演示](#演示)
 - [侧栏定位](#侧栏定位)
 - [下载与安装](#下载与安装)
-- [v0.3.9 更新](#v039-更新)
+- [v0.3.10 更新](#v0310-更新)
 - [兼容性与当前限制](#兼容性与当前限制)
 - [实现方式](#实现方式)
 - [源码运行与构建](#源码运行与构建)
@@ -61,6 +61,8 @@ DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些
   一条未读都没有时它自己收起来。
 - **颜色告诉你哪条在等**：每个会话固定一个颜色，未读行左边一条 2px 竖线、角标用最新那条的同一个色，
   悬在角标上还会写出是哪个会话；悬浮条和铃铛共用这一套，也共用同一份「看过了」记录。
+- **后台任务看得见**：会话还挂着后台任务时，那一行的时间前面多一个小蓝块，数字就是还在跑的任务条数；
+  任务跑完自己消失。铃铛和悬浮条读同一份数据，两边不会各说各话。
 - **侧栏定位**：跳转之后，官方左侧边栏会滚到这条会话所在的行。细节见 [侧栏定位](#侧栏定位)。
 - **Ctrl+M 开新会话**：任意位置按 `Ctrl+M`，就在当前文件夹开一个新会话，和官方「新建会话」按钮同一个动作。
   焦点在输入框里时它不抢这个键——那里 `Ctrl+M` 等同回车，会把没写完的话发出去。
@@ -142,10 +144,11 @@ dsh plugin --profile web remove dsh-session-top-new
 dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 ```
 
-## v0.3.9 更新
+## v0.3.10 更新
 
 | 版本 | 内容 |
 | --- | --- |
+| 0.3.10 | 正在跑后台任务的会话，行尾多一个蓝色数字小块，铃铛与悬浮条都有 |
 | 0.3.9 | 角标退回纯读数：点角标不再清空数字（清空只留在面板标题行）；颜色竖线、角标取色、悬停写明来源全部保留 |
 | 0.3.8 | 未读行加 2px 颜色竖线，角标取最新未读会话的颜色，悬停写明来源 |
 | 0.3.7 | `Ctrl+M` 在当前文件夹开新会话（输入框聚焦时不拦）；顺手修掉一条按天分组测试在 23 点后会假失败的时间窗问题 |
@@ -163,7 +166,7 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 
 - 只针对 **DSH Web GUI**。桌面端与 CLI 没有这套侧栏。
 - 插件读的是官方 UI 自己也在用的客户端服务：`sessions.list`、`uiSession.sessionStatus`、
-  `uiWorkspace.openSession`、`uiWorkspace.startSession`。它们不是冻结的公开 API，Harness 升级可能改名或改结构；
+  `uiWorkspace.openSession`、`uiWorkspace.startSession`，以及可选的 `jobs`（拿不到就不显示后台任务小块）。它们不是冻结的公开 API，Harness 升级可能改名或改结构；
   真出问题时，控制台里会有一条 `[dsh-session-top-new]` 警告，而不是静默失效。
 - 侧栏表头没有对外暴露的插槽（Slots 里没有 header actions 这一项），所以铃铛是**注入**进表头 DOM 的：
   找「工作区 / Workspace」（或「会话 / Sessions」）标签，往上找到同时放着几个控件的那一行，插在搜索控件之前。
@@ -183,6 +186,7 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 | 按天分组 | 本地按 `updatedAt` 分桶：今天 / 昨天 / 一周内星期名 / 更早 `MM-DD`（跨年带年份） |
 | 未读颜色 | 会话 id 哈希到 8 个色相；未读行的 2px 竖线与角标取同一个色 |
 | 一键清空 | 一份共享的「看过了」集合，两个列表、两个角标都从它算；入口只有面板标题行 |
+| 后台任务标记 | 客户端 `jobs` 服务：`state.getSnapshot().rows` 按会话分组，`watchRows(id)` 开流；只数 `running` / `stopping` |
 | 侧栏行定位 | 官方侧栏 DOM 中的会话行（按 id 匹配后 `scrollIntoView`） |
 
 两个界面共用一份快照：`dock` 订阅上面两个数据源，抽出一层只含标量的扁平结构，
