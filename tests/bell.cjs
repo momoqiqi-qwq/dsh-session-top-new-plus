@@ -190,7 +190,7 @@ let subscriptions = 0;
 let dockState = { items: [
 	{ id: "parent", title: "Parent", updatedAt: Date.now() },
 	{ id: "child", parentId: "parent", title: "Child", running: true, updatedAt: Date.now() },
-	{ id: "unread", title: "Unread", unread: true, updatedAt: Date.now() },
+	{ id: "unread", title: "Unread", unread: true, jobs: 3, updatedAt: Date.now() },
 	{ id: "old", title: "Old", unread: true, updatedAt: Date.now() - 4 * 86400000 },
 	{ id: "blank", title: "Blank", blank: true, updatedAt: Date.now() }
 ], current: null };
@@ -312,6 +312,13 @@ assert.equal(localStorage.getItem("dsh-session-top-new.dock"), "1");
 // Right-click a session: the bookmark path that needs nothing from the transcript
 // but the row's id and title, which is why it cannot fail the way the reply
 // button could (a message body whose markup we can no longer read).
+// Background jobs get their own pill between the title and the clock, so a row
+// that is still working reads differently from one that merely finished.
+const jobTags = scroll.querySelectorAll(".dsb-job");
+assert.equal(jobTags.length, 1, "only the session with live jobs carries a pill");
+assert.equal(jobTags[0].textContent, "3", "the pill shows the count");
+assert.match(jobTags[0].title, /3 个后台任务在跑/, "and says what it counts");
+assert.equal(jobTags[0].parentElement.querySelector(".dsb-time").textContent.length > 0, true, "the pill sits before the clock");
 const rowJump = scroll.querySelector("[data-session]");
 assert.ok(rowJump, "the list has a row to right-click");
 const rowId = rowJump.dataset.session; // the fixture keeps dataset and attrs apart
@@ -639,6 +646,32 @@ const bell = registrations.get("dsh-session-top-new-bell").options.inject().sour
 assert.equal(shared.getSnapshot().items[0].running, true);
 assert.equal(bell.getSnapshot().runningCount, 1);
 assert.equal(bell.getSnapshot().items[0].title, "Late service");
+// Background jobs: the client `jobs` service is optional, mounts late, and only
+// streams rows for sessions someone watches — the plugin mirrors what it renders.
+let jobRows = {};
+const jobWatches = new Map();
+let jobSubscriptions = 0;
+let jobListener = null;
+services.jobs = {
+	state: {
+		getSnapshot: () => ({ rows: jobRows }),
+		subscribe(fn) { jobSubscriptions++; jobListener = fn; return () => { jobSubscriptions--; jobListener = null; }; }
+	},
+	watchRows(id) {
+		jobWatches.set(id, (jobWatches.get(id) || 0) + 1);
+		return () => jobWatches.set(id, (jobWatches.get(id) || 1) - 1);
+	}
+};
+serviceEvents.forEach((fn) => fn("jobs"));
+assert.equal(jobSubscriptions, 1, "the jobs snapshot is subscribed once");
+assert.equal(jobWatches.get("late"), 1, "a rendered session opens one job watch");
+jobRows = { late: [{ id: "j1", status: "running" }, { id: "j2", status: "stopping" }, { id: "j3", status: "completed" }] };
+jobListener();
+assert.equal(shared.getSnapshot().items[0].jobs, 2, "running and stopping count, finished jobs do not");
+assert.equal(bell.getSnapshot().items[0].jobs, 2, "the bell reads the same number");
+jobRows = {};
+jobListener();
+assert.equal(shared.getSnapshot().items[0].jobs, 0, "clearing every job drops the marker");
 // One clear, both surfaces: the bell's header control writes the shared set, and
 // the dock snapshot the dock badge counts from follows it.
 assert.equal(bell.getSnapshot().unreadCount, 1, "the late session starts unread");
@@ -672,6 +705,8 @@ assert.equal(registrations.size, 0);
 assert.equal(serviceEvents.size, 0);
 assert.equal(listUnsubscribed, 1);
 assert.equal(statusUnsubscribed, 1);
+assert.equal(jobSubscriptions, 0, "disposing the plugin unsubscribes from the jobs service");
+assert.equal(jobWatches.get("late"), 0, "and releases the per-session job watch");
 assert.equal(frames.size, 0);
 document.dispatchEvent({ type: "keydown", key: "m", ctrlKey: true, preventDefault() {} });
 assert.equal(started, 1, "disposing the plugin unbinds the shortcut");
@@ -734,4 +769,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
