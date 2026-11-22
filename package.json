@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-top-new",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Session overview dock and sidebar activity bell for the DeepSeek Harness Web GUI: recent activity grouped by day, a numeric unread badge on the bell, one-click jump, and a completion chime.",
   "license": "MIT",
   "type": "module",
