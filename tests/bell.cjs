@@ -546,6 +546,25 @@ assert.equal(snap.items.find((it) => it.id === "finished").unread, false, "the f
 assert.equal(snap.items.find((it) => it.id === "ask").pending, true, "the pending row is untouched");
 assert.equal(snap.unreadCount, 1, "a row that still needs an answer keeps nudging");
 assert.ok(root.querySelector("[data-clear-unread]"), "and its group header stays");
+// The badge wears the colour of the row it is counting, and clicking it clears
+// the number: the count is the thing you are looking at, so it is the thing you
+// can dismiss without opening two sessions to empty it.
+dockState = { items: [
+	{ id: "alpha", title: "Alpha", unread: true, updatedAt: Date.now() + 2000 },
+	{ id: "beta", title: "Beta", unread: true, updatedAt: Date.now() }
+], current: null };
+listeners.forEach((fn) => fn());
+const badgeEl = anchor.button.querySelector(".dsb-badge");
+const striped = scroll.querySelectorAll(".dsb-stripe");
+assert.equal(striped.length, 2, "every unread row carries a colour stripe");
+assert.equal(striped[0].style["--dsb-accent"], badgeEl.style.background, "the badge borrows the newest row's colour");
+assert.notEqual(striped[0].style["--dsb-accent"], striped[1].style["--dsb-accent"], "different sessions get different hues");
+assert.match(anchor.button.title, /Alpha/, "the title names the session behind the number");
+badgeEl.dispatchEvent({ type: "click", preventDefault() {}, stopPropagation() {} });
+snap = source.getSnapshot();
+assert.equal(snap.unreadCount, 0, "clicking the badge clears the number");
+assert.equal(anchor.button.classList.contains("dsb-unread"), false, "the badge hides with the last unread row");
+assert.equal(badgeEl.dataset.tint, "", "and the tint is dropped");
 localStorage.removeItem("dsh-session-top-new.days");
 anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
 assert.equal(listeners.size, 0);
@@ -607,7 +626,7 @@ services.sessions = { list: {
 } };
 serviceEvents.forEach((fn) => fn("sessions"));
 services.uiSession = { sessionStatus: {
-	getSnapshot: () => ({ late: { running: true } }),
+	getSnapshot: () => ({ late: { running: true, completionUnread: true } }),
 	subscribe(fn) { statusListener = fn; statusSubscriptions++; return () => statusUnsubscribed++; }
 } };
 serviceEvents.forEach((fn) => fn("uiSession"));
@@ -615,11 +634,20 @@ serviceEvents.forEach((fn) => fn("sessions"));
 assert.equal(listSubscriptions, 1);
 assert.equal(statusSubscriptions, 1);
 statusListener();
-const shared = registrations.get("dsh-session-top-new").options.inject().hooks.dock;
+const dockProps = registrations.get("dsh-session-top-new").options.inject();
+assert.equal(typeof dockProps.clearUnread, "function", "the dock badge is given a way to clear the count");
+const shared = dockProps.hooks.dock;
 const bell = registrations.get("dsh-session-top-new-bell").options.inject().source;
 assert.equal(shared.getSnapshot().items[0].running, true);
 assert.equal(bell.getSnapshot().runningCount, 1);
 assert.equal(bell.getSnapshot().items[0].title, "Late service");
+// One clear, both surfaces: the dock badge and the bell badge read one set.
+const lateUnread = shared.getSnapshot().items.filter((it) => it.unread).map((it) => it.id);
+if (lateUnread.length) {
+	assert.equal(shared.markAllSeen(), true, "the dock clears unread rows on its own");
+	assert.equal(shared.getSnapshot().items.some((it) => it.unread), false, "and the snapshot follows");
+	assert.equal(bell.getSnapshot().unreadCount, 0, "the bell counts the same cleared set");
+}
 let opened;
 let started = 0;
 services.uiWorkspace = { openSession(id) { opened = id; }, startSession() { started++; } };
@@ -708,4 +736,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour and one-click clear; dock badge clears too; inverted auto theme; gear picker; persisted mode");
