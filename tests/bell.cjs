@@ -570,6 +570,18 @@ assert.match(anchor.button.title, /Alpha/, "the title names the session behind t
 // The badge is a readout, not a button: clicking the bell opens the panel and
 // clearing stays an explicit action in the header.
 assert.equal(badgeEl.listeners.get("click"), undefined, "clicking the badge does not clear anything");
+// Being read belongs to one version of a session: a run that bumps updatedAt is
+// unread again, so clicking through rows cannot silence a conversation for the
+// rest of the tab.
+assert.equal(source.markAllSeen(), true, "clearing everything records both rows");
+listeners.forEach((fn) => fn());
+assert.equal(source.getSnapshot().unreadCount, 0);
+dockState = { items: [
+	{ id: "alpha", title: "Alpha", unread: true, updatedAt: Date.now() + 9000 }
+], current: null };
+listeners.forEach((fn) => fn());
+assert.equal(source.getSnapshot().unreadCount, 1, "a new version of a read session is unread again");
+assert.equal(scroll.querySelectorAll(".dsb-stripe").length, 1, "and it gets its stripe back");
 localStorage.removeItem("dsh-session-top-new.days");
 anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
 assert.equal(listeners.size, 0);
@@ -769,4 +781,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour; unread per version; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
