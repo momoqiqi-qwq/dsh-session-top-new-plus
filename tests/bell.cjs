@@ -706,12 +706,40 @@ document.dispatchEvent({ type: "keydown", key: "M", ctrlKey: true, shiftKey: tru
 assert.equal(started, 1, "Ctrl+Shift+M is not the shortcut");
 document.dispatchEvent({ type: "keydown", key: "m" });
 assert.equal(started, 1, "a bare m is left to the page");
+// The caret sits in the composer most of the time: an empty one must not eat
+// the key, a field with a draft must.
 const composer = new Element("textarea");
+composer.value = "";
 const inField = { type: "keydown", key: "m", ctrlKey: true, target: composer };
 inField.preventDefault = () => { inField.prevented = true; };
 document.dispatchEvent(inField);
-assert.equal(started, 1, "a focused composer keeps Ctrl+M");
-assert.notEqual(inField.prevented, true, "the composer handles its own key");
+assert.equal(started, 2, "an empty composer lets Ctrl+M through");
+composer.value = "half written";
+const typed = { type: "keydown", key: "m", ctrlKey: true, target: composer };
+typed.preventDefault = () => { typed.prevented = true; };
+document.dispatchEvent(typed);
+assert.equal(started, 2, "a composer with a draft keeps Ctrl+M");
+assert.notEqual(typed.prevented, true, "the composer handles its own key");
+const rich = new Element("div");
+rich.setAttribute("contenteditable", "true");
+const inRich = { type: "keydown", key: "m", ctrlKey: true, target: rich };
+document.dispatchEvent(inRich);
+assert.equal(started, 2, "a contenteditable block keeps Ctrl+M");
+// An input method reports the letter as "Process" while the physical key is
+// still KeyM — the case that used to fail exactly while typing Chinese.
+document.dispatchEvent({ type: "keydown", key: "Process", code: "KeyM", ctrlKey: true });
+assert.equal(started, 3, "Ctrl+M survives an input method");
+// The shell may mark the key handled before a bubble listener would see it;
+// ours listens in capture and still owns the shortcut.
+document.dispatchEvent({ type: "keydown", key: "m", ctrlKey: true, defaultPrevented: true, preventDefault() {} });
+assert.equal(started, 4, "a key the shell already marked still opens a session");
+// Window and document both see one keystroke: one session, not two.
+const twice = { type: "keydown", key: "m", ctrlKey: true };
+twice.preventDefault = () => { twice.prevented = true; };
+window.dispatchEvent(twice);
+document.dispatchEvent(twice);
+assert.equal(started, 5, "the same keystroke seen twice opens one session");
+assert.equal(twice.prevented, true, "and it is swallowed once");
 effectDisposers.reverse().forEach((fn) => fn());
 assert.equal(registrations.size, 0);
 assert.equal(serviceEvents.size, 0);
@@ -721,7 +749,7 @@ assert.equal(jobSubscriptions, 0, "disposing the plugin unsubscribes from the jo
 assert.equal(jobWatches.get("late"), 0, "and releases the per-session job watch");
 assert.equal(frames.size, 0);
 document.dispatchEvent({ type: "keydown", key: "m", ctrlKey: true, preventDefault() {} });
-assert.equal(started, 1, "disposing the plugin unbinds the shortcut");
+assert.equal(started, 5, "disposing the plugin unbinds the shortcut");
 // The shipped sidebar root only carries hashed CSS-module classes (wtg9ga_root)
 // and its section header is a plain div, so nothing matches a sidebar-ish
 // selector. The bell must still anchor on the 工作区 row via the document scope.
@@ -781,4 +809,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour; unread per version; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
