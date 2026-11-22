@@ -560,11 +560,9 @@ assert.equal(striped.length, 2, "every unread row carries a colour stripe");
 assert.equal(striped[0].style["--dsb-accent"], badgeEl.style.background, "the badge borrows the newest row's colour");
 assert.notEqual(striped[0].style["--dsb-accent"], striped[1].style["--dsb-accent"], "different sessions get different hues");
 assert.match(anchor.button.title, /Alpha/, "the title names the session behind the number");
-badgeEl.dispatchEvent({ type: "click", preventDefault() {}, stopPropagation() {} });
-snap = source.getSnapshot();
-assert.equal(snap.unreadCount, 0, "clicking the badge clears the number");
-assert.equal(anchor.button.classList.contains("dsb-unread"), false, "the badge hides with the last unread row");
-assert.equal(badgeEl.dataset.tint, "", "and the tint is dropped");
+// The badge is a readout, not a button: clicking the bell opens the panel and
+// clearing stays an explicit action in the header.
+assert.equal(badgeEl.listeners.get("click"), undefined, "clicking the badge does not clear anything");
 localStorage.removeItem("dsh-session-top-new.days");
 anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
 assert.equal(listeners.size, 0);
@@ -635,19 +633,19 @@ assert.equal(listSubscriptions, 1);
 assert.equal(statusSubscriptions, 1);
 statusListener();
 const dockProps = registrations.get("dsh-session-top-new").options.inject();
-assert.equal(typeof dockProps.clearUnread, "function", "the dock badge is given a way to clear the count");
+assert.equal(dockProps.clearUnread, undefined, "the dock badge is not wired to clear the count");
 const shared = dockProps.hooks.dock;
 const bell = registrations.get("dsh-session-top-new-bell").options.inject().source;
 assert.equal(shared.getSnapshot().items[0].running, true);
 assert.equal(bell.getSnapshot().runningCount, 1);
 assert.equal(bell.getSnapshot().items[0].title, "Late service");
-// One clear, both surfaces: the dock badge and the bell badge read one set.
-const lateUnread = shared.getSnapshot().items.filter((it) => it.unread).map((it) => it.id);
-if (lateUnread.length) {
-	assert.equal(shared.markAllSeen(), true, "the dock clears unread rows on its own");
-	assert.equal(shared.getSnapshot().items.some((it) => it.unread), false, "and the snapshot follows");
-	assert.equal(bell.getSnapshot().unreadCount, 0, "the bell counts the same cleared set");
-}
+// One clear, both surfaces: the bell's header control writes the shared set, and
+// the dock snapshot the dock badge counts from follows it.
+assert.equal(bell.getSnapshot().unreadCount, 1, "the late session starts unread");
+assert.equal(shared.getSnapshot().items[0].unread, true);
+bell.markAllSeen();
+assert.equal(shared.getSnapshot().items[0].unread, false, "the dock side sees the bell's clear");
+assert.equal(bell.getSnapshot().unreadCount, 0, "and the bell counts the same cleared set");
 let opened;
 let started = 0;
 services.uiWorkspace = { openSession(id) { opened = id; }, startSession() { started++; } };
@@ -736,4 +734,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour and one-click clear; dock badge clears too; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session; badge colour; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
