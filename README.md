@@ -20,6 +20,7 @@
 - [演示](#演示)
 - [侧栏定位](#侧栏定位)
 - [下载与安装](#下载与安装)
+- [v0.3.18 更新](#v0318-更新)
 - [v0.3.17 更新](#v0317-更新)
 - [v0.3.16 更新](#v0316-更新)
 - [v0.3.15 更新](#v0315-更新)
@@ -97,7 +98,9 @@ DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些
   铃铛列的仍是同一批会话，功能不丢，再打开时回到原来的位置。
 - **右键加书签**：在悬浮条或铃铛里右键任意会话行选「加入书签」，它会进面板底部的书签区；
   一个会话只留一条，再次右键就是「移除书签」。这条路只依赖会话的 id 与标题，不猜 DOM，所以不会点不动。
-- **沿用上游的悬浮条**：圆形按钮可拖到任意位置并按窗口比例记忆、近 N 天窗口（1–365）、
+- **悬浮条可以拖**：圆形按钮能拖，展开以后的标题行也能拖——按在「会话列表」那一行直接拖走，
+  位置按窗口比例记忆；标题行里的「近 N 天」、铃铛、齿轮按下仍是原来的点击，不会误拖。
+- **沿用上游的悬浮条**：近 N 天窗口（1–365）、
   父子折叠、悬停 ✕ 忽略该行（有新记录时自己回来）、贴边时面板朝另一侧展开、
   会话跑完响一声（Web Audio 合成，可静音）。
 
@@ -155,7 +158,7 @@ DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些
 <img src="./assets/demo-dock.png" alt="悬浮的会话条：标题行、近 N 天、会话列表、书签区和底部计数" width="400" />
 
 上游那颗悬浮条仍然在：标题行带「近 N 天」、静音与齿轮，下面是会话列表与书签区，
-底部是「几个进行中 · 几个未读结果」。
+底部是「几个进行中 · 几个未读结果」。想搬走它，按在标题行上拖就行。
 
 ### 右键书签
 
@@ -192,6 +195,12 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 dsh plugin --profile web remove dsh-session-top-new
 dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 ```
+
+## v0.3.18 更新
+
+| 版本 | 内容 |
+| --- | --- |
+| 0.3.18 | 悬浮条展开后可以按标题行拖动：以前只有圆形按钮能拖，面板打开盖住按钮就只能先收起；现在两者共用同一个锚点，面板不会和按钮脱开，拖动中面板保持原来那一侧不翻转 |
 
 ## v0.3.17 更新
 
@@ -248,6 +257,7 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 | 未读颜色 | 会话 id 哈希到 8 个色相；未读行的 2px 竖线与角标取同一个色 |
 | 未读记忆 | 共享的 `unreadSeen`：键是「会话 id + `updatedAt`」，看过只压住那一版，同一会话再跑完重新算未读；超过 400 条丢最旧的 |
 | 一键清空 | 同一份 `unreadSeen`，两个列表、两个角标都从它算；入口只有面板标题行 |
+| 悬浮条拖动 | 圆按钮与标题行都调 `startMove(e)`，移动同一个锚点 `pos{xp,yp}`（窗口比例），所以面板永远跟着按钮；`startsDockDrag()` 判掉标题行里的 button/input/label，拖动中 `flipRef` 锁住面板朝向 |
 | 不透明度 | `themeSource.setOpacity(30..100)`：写 `--dsb-opacity` / `--dsd-alpha`，背景走 `color-mix(..., transparent)`，低于 100% 才挂 `data-dsb-faded` 打开 `backdrop-filter`；回到 100 就删掉 `localStorage` 的 `dsh-session-top-new.opacity` |
 | 背景色 | `themeSource.setSurface(hex)`：一个 hex 推导整套变量（浅底换深字），写进 `localStorage` 的 `dsh-session-top-new.surface`，铃铛与悬浮条共用同一份 |
 | 面板尺寸 | `sizePref`：`localStorage` 的 `dsh-session-top-new.size`，`{ w, h }` 为 `0` 表示该轴仍由面板自选；`pointerdown` 在面板根上做 8px 边距命中测试，滚动条那 14px 让给列表 |
