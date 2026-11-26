@@ -1,6 +1,6 @@
 {
   "id": "dsh-session-top-new",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "main": "lib/index.js",
   "description": "Session overview dock and sidebar activity bell for the DeepSeek Harness Web GUI: recent activity grouped by day, numeric unread badge, click-to-jump, completion chime.",
   "engines": {
