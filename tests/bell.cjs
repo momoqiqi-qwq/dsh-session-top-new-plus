@@ -19,6 +19,7 @@ class Element {
 		this.dataset = {};
 		this.style = {};
 		this.style.setProperty = (name, value) => { this.style[name] = String(value); };
+		this.style.removeProperty = (name) => { delete this.style[name]; };
 		this.listeners = new Map();
 		this.className = "";
 		this._text = "";
@@ -227,16 +228,22 @@ assert.equal(layoutReads, reads, "anchor recovery performs no layout read");
 // Theme surface: the panel paints from its own attribute, never from host tokens,
 // and the gear row must drive the shared theme source.
 const themeCalls = [];
+const surfaceCalls = [];
 const themeStub = {
 	mode: "auto",
 	resolved: "light",
 	roots: [],
 	listeners: new Set(),
-	getSnapshot() { return { mode: this.mode, resolved: this.resolved }; },
+	getSnapshot() { return { mode: this.mode, resolved: this.resolved, surface: this.surface || "" }; },
 	subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
 	setMode(next) {
 		this.mode = next;
 		themeCalls.push(next);
+		for (const fn of [...this.listeners]) fn(this.getSnapshot());
+	},
+	setSurface(next) {
+		this.surface = next;
+		surfaceCalls.push(next);
 		for (const fn of [...this.listeners]) fn(this.getSnapshot());
 	},
 	apply(el) {
@@ -309,6 +316,23 @@ assert.equal(localStorage.getItem("dsh-session-top-new.dock"), "0", "hiding the 
 root.dispatchEvent({ type: "click", target: dockToggle });
 assert.equal(dockToggle.attrs["aria-checked"], "true", "clicking again brings it back");
 assert.equal(localStorage.getItem("dsh-session-top-new.dock"), "1");
+// Background swatches: 默认, the palette, then the system picker. Every cell
+// writes through the theme source so the panel and the dock repaint together.
+const swatches = settingsEl.querySelectorAll(".dsb-swatch");
+assert.equal(swatches.length, 12, "默认 / 10 preset colours / 自定义");
+assert.equal(swatches[0].attrs["data-surface"], "", "the first cell is 默认");
+assert.match(swatches[0].className, /dsb-swatch-auto/, "and it wears the slash that means no colour");
+const inkSwatch = swatches.find((b) => b.attrs["data-surface"] === "#1e2432");
+assert.ok(inkSwatch, "墨蓝 is on the palette");
+assert.equal(swatches[swatches.length - 1].querySelector("input").attrs.type, "color", "the last cell opens the system picker");
+root.dispatchEvent({ type: "click", target: inkSwatch });
+assert.deepEqual(surfaceCalls, ["#1e2432"], "a swatch writes through the theme source");
+assert.match(settingsEl.querySelector("[data-surface-now]").textContent, /#1E2432/, "the row echoes the colour");
+assert.match(inkSwatch.className, /\bon\b/, "the picked swatch takes the ring");
+root.dispatchEvent({ type: "click", target: swatches[0] });
+assert.deepEqual(surfaceCalls, ["#1e2432", ""], "默认 hands the background back to the palette");
+assert.match(settingsEl.querySelector("[data-surface-now]").textContent, /默认/);
+surfaceCalls.length = 0;
 // Right-click a session: the bookmark path that needs nothing from the transcript
 // but the row's id and title, which is why it cannot fail the way the reply
 // button could (a message body whose markup we can no longer read).
@@ -826,8 +850,27 @@ pokeTheme();
 assert.equal(fakeRoot.attrs["data-dsb-theme"], "dark");
 realTheme.setMode("auto");
 assert.equal(fakeRoot.attrs["data-dsb-theme"], "dark");
+// Custom background: one hex repaints every surface variable from a derived
+// palette, and 默认 hands the whole set back to the light/dark defaults.
+assert.equal(realTheme.getSnapshot().surface, "", "no custom background by default");
+realTheme.setSurface("#1e2432");
+assert.equal(localStorage.getItem("dsh-session-top-new.surface"), "#1e2432", "the colour is persisted");
+assert.equal(realTheme.getSnapshot().surface, "#1e2432");
+assert.equal(fakeRoot.style["--dsb-surface"], "#1e2432", "the panel background follows the swatch");
+assert.ok(fakeRoot.style["--dsb-label"], "ink is derived from the same colour");
+realTheme.setSurface("#ABCDEF");
+assert.equal(realTheme.getSnapshot().surface, "#abcdef", "a picked colour is normalised to lowercase");
+realTheme.setSurface("nonsense");
+assert.equal(realTheme.getSnapshot().surface, "", "a malformed colour falls back to the palette");
+assert.equal(fakeRoot.style["--dsb-surface"], undefined, "the override is dropped, not painted black");
+realTheme.setSurface("#1e2432");
+assert.equal(fakeRoot.style["--dsb-surface"], "#1e2432", "a real colour paints again");
+realTheme.setSurface("");
+assert.equal(realTheme.getSnapshot().surface, "");
+assert.equal(fakeRoot.style["--dsb-surface"], undefined, "默认 drops the override so the palette returns");
+localStorage.removeItem("dsh-session-top-new.surface");
 localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; background job pill; dock badge stays a readout; inverted auto theme; custom background; gear picker; persisted mode");
