@@ -582,6 +582,27 @@ dockState = { items: [
 listeners.forEach((fn) => fn());
 assert.equal(source.getSnapshot().unreadCount, 1, "a new version of a read session is unread again");
 assert.equal(scroll.querySelectorAll(".dsb-stripe").length, 1, "and it gets its stripe back");
+// Drag a border to size the panel; the corner also drags vertical. The hit test
+// lives on the panel root, so the fixture only has to hand it a box.
+const realRect = root.getBoundingClientRect;
+root.getBoundingClientRect = () => ({ left: 150, top: 200, right: 470, bottom: 700, width: 320, height: 500 });
+root.dispatchEvent({ type: "pointerdown", button: 0, clientX: 469, clientY: 699, preventDefault() {}, stopPropagation() {} });
+assert.match(root.className, /dsb-resizing/, "the border shows it is being dragged");
+document.dispatchEvent({ type: "pointermove", clientX: 569, clientY: 799, preventDefault() {} });
+assert.equal(root.style.width, "420px", "the corner drag widens the panel by the pointer delta");
+assert.notEqual(root.style.height, undefined);
+document.dispatchEvent({ type: "pointerup" });
+assert.doesNotMatch(root.className, /dsb-resizing/, "letting go ends the drag");
+assert.equal(JSON.parse(localStorage.getItem("dsh-session-top-new.size")).w, 420, "the box is remembered for next time");
+// A drag that starts on a row must never resize: the border is eight pixels.
+root.dispatchEvent({ type: "pointerdown", button: 0, clientX: 300, clientY: 400 });
+document.dispatchEvent({ type: "pointermove", clientX: 500, clientY: 500, preventDefault() {} });
+assert.equal(root.style.width, "420px", "a drag from the row area leaves the box alone");
+assert.doesNotMatch(root.className, /dsb-resizing/);
+// Double-click the corner: the panel goes back to picking its own size.
+root.dispatchEvent({ type: "pointerdown", button: 0, clientX: 469, clientY: 699, detail: 2, preventDefault() {}, stopPropagation() {} });
+assert.equal(JSON.parse(localStorage.getItem("dsh-session-top-new.size")).w, 0, "the corner double-click forgets the box");
+root.getBoundingClientRect = realRect;
 localStorage.removeItem("dsh-session-top-new.days");
 anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
 assert.equal(listeners.size, 0);
@@ -809,4 +830,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; background job pill; dock badge stays a readout; inverted auto theme; gear picker; persisted mode");
