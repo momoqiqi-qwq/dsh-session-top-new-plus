@@ -20,6 +20,7 @@
 - [演示](#演示)
 - [侧栏定位](#侧栏定位)
 - [下载与安装](#下载与安装)
+- [v0.3.19 更新](#v0319-更新)
 - [v0.3.18 更新](#v0318-更新)
 - [v0.3.17 更新](#v0317-更新)
 - [v0.3.16 更新](#v0316-更新)
@@ -100,6 +101,8 @@ DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些
   一个会话只留一条，再次右键就是「移除书签」。这条路只依赖会话的 id 与标题，不猜 DOM，所以不会点不动。
 - **悬浮条可以拖**：圆形按钮能拖，展开以后的标题行也能拖——按在「会话列表」那一行直接拖走，
   位置按窗口比例记忆；标题行里的「近 N 天」、铃铛、齿轮按下仍是原来的点击，不会误拖。
+- **被挡住会自己让开**：宿主的面板、抽屉、浮层要是压在这颗按钮上，它会先往上、再往下、
+  然后是左边（侧栏那侧）一格一格地找，挪到第一个没被盖住的位置并记住——不会停在看不见的地方等你猜。
 - **沿用上游的悬浮条**：近 N 天窗口（1–365）、
   父子折叠、悬停 ✕ 忽略该行（有新记录时自己回来）、贴边时面板朝另一侧展开、
   会话跑完响一声（Web Audio 合成，可静音）。
@@ -196,6 +199,12 @@ dsh plugin --profile web remove dsh-session-top-new
 dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 ```
 
+## v0.3.19 更新
+
+| 版本 | 内容 |
+| --- | --- |
+| 0.3.19 | 悬浮条被宿主浮层压住时自己挪开：每 1.5 秒问一次浏览器「按钮正中那一层是谁」，连续两次都不是自己就沿着上下、再向侧栏方向逐格试探，挪到第一个空闲位置并写进记忆；全部被占就原地不动，拖动中绝不插手 |
+
 ## v0.3.18 更新
 
 | 版本 | 内容 |
@@ -257,6 +266,7 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 | 未读颜色 | 会话 id 哈希到 8 个色相；未读行的 2px 竖线与角标取同一个色 |
 | 未读记忆 | 共享的 `unreadSeen`：键是「会话 id + `updatedAt`」，看过只压住那一版，同一会话再跑完重新算未读；超过 400 条丢最旧的 |
 | 一键清空 | 同一份 `unreadSeen`，两个列表、两个角标都从它算；入口只有面板标题行 |
+| 遮挡避让 | `document.elementFromPoint()` 命中不是 dock 自身即算被压住；`dockEscapeSpots()` 给出候选序列（同列上下 → 向左靠侧栏 → 窗口边缘），逐点移动真实节点并当场补测，命中空闲就 `setPos` + 存 `pos`；拖动中由 `dragRef` 守卫跳过 |
 | 悬浮条拖动 | 圆按钮与标题行都调 `startMove(e)`，移动同一个锚点 `pos{xp,yp}`（窗口比例），所以面板永远跟着按钮；`startsDockDrag()` 判掉标题行里的 button/input/label，拖动中 `flipRef` 锁住面板朝向 |
 | 不透明度 | `themeSource.setOpacity(30..100)`：写 `--dsb-opacity` / `--dsd-alpha`，背景走 `color-mix(..., transparent)`，低于 100% 才挂 `data-dsb-faded` 打开 `backdrop-filter`；回到 100 就删掉 `localStorage` 的 `dsh-session-top-new.opacity` |
 | 背景色 | `themeSource.setSurface(hex)`：一个 hex 推导整套变量（浅底换深字），写进 `localStorage` 的 `dsh-session-top-new.surface`，铃铛与悬浮条共用同一份 |
