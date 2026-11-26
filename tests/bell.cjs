@@ -213,9 +213,14 @@ assert.deepEqual({ ...mutations[0].config }, { childList: true, subtree: true })
 const lookups = sidebar.lookups;
 const reads = layoutReads;
 for (let i = 0; i < 500; i++) mutations[0].fn();
-assert.equal(frames.size, 0, "attached button makes mutation callbacks O(1)");
+// Seated is no longer a no-op: the list around an attached bell can still have
+// moved it, so the callback asks for one follow frame — never more than one,
+// however many mutations a streaming turn throws at it.
+assert.equal(frames.size, 1, "500 attached mutations coalesce into one follow frame");
 assert.equal(sidebar.lookups, lookups);
 assert.equal(layoutReads, reads);
+flush();
+assert.equal(layoutReads, reads, "a follow frame with the panel shut reads no layout");
 row.remove(); row = header("Workspaces"); sidebar.append(row);
 for (let i = 0; i < 500; i++) mutations[0].fn();
 assert.equal(frames.size, 1, "500 detached-button callbacks coalesce into one frame");
@@ -474,6 +479,19 @@ assert.equal(root.style["--dsb-origin"], "bottom left", "flipped panel grows out
 assert.equal(root.style["--dsb-from"], "6px");
 assert.equal(root.style.top, "auto", "panel flips upward near bottom edge");
 assert.equal(root.style.bottom, "66px");
+// A turn streaming above the bell rewrites the row and pushes it down. The panel
+// used to keep the box it was born with and end up floating a session list away;
+// every mutation is now a chance to follow it.
+buttonTop = 700; mutations[0].fn(); flush();
+assert.equal(root.style.bottom, "106px", "a rewritten row drags the open panel with the bell");
+assert.equal(frames.size, 0, "following lands in one frame, not one per mutation");
+buttonTop = 600;
+(window.listeners.get("scroll") || []).forEach((fn) => fn({ type: "scroll" }));
+assert.equal(root.style.bottom, "206px", "the sidebar scrolling under the bell pulls the panel too");
+const settled = root.style.bottom;
+buttonTop = 600; mutations[0].fn(); flush();
+assert.equal(root.style.bottom, settled, "a repaint that moved nothing leaves the box alone");
+buttonTop = 740; mutations[0].fn(); flush();
 sidebar.width = 60; resizes[0].fn();
 assert.match(anchor.button.className, /dsb-rail/);
 assert.equal(source.getSnapshot().open, false);
@@ -873,4 +891,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; background job pill; dock badge stays a readout; inverted auto theme; custom background; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; background job pill; dock badge stays a readout; inverted auto theme; custom background; gear picker; persisted mode");
