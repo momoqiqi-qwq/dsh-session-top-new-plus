@@ -1,5 +1,5 @@
 <!--
-  中文速览 — 这是主说明：顶部横幅 + 一句话定位 + 可以做什么 + 六组演示图 +
+  中文速览 — 这是主说明：顶部横幅 + 一句话定位 + 可以做什么 + 七组演示图 +
   侧栏定位 + 下载安装 + 版本表 + 实现方式 + 提交信息约定。
   上游原始说明另存 README.upstream.md，两份都保留；改演示图时同步 screenshots.json。
 -->
@@ -20,6 +20,7 @@
 - [演示](#演示)
 - [侧栏定位](#侧栏定位)
 - [下载与安装](#下载与安装)
+- [v0.3.17 更新](#v0317-更新)
 - [v0.3.16 更新](#v0316-更新)
 - [v0.3.15 更新](#v0315-更新)
 - [v0.3.14 更新](#v0314-更新)
@@ -62,6 +63,9 @@ DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些
 - **一键全部已读**：面板标题行右边的「全部已读」一次清空，不必为了清数字去把每条都开一遍；
   角标只负责报数，点它不会清——点哪儿都是打开面板，位置不会背叛你；
   一条未读都没有时它自己收起来。
+- **面板可以是半透明的**：齿轮里多一行「不透明度」，30% 到 100% 随便拖，面板和悬浮条一起变淡，
+  背后的侧栏文字还能看清；低于 100% 才给背景加毛玻璃，100% 时颜色和以前逐像素一致，
+  数值记在本机，下次打开还是你上次的样子。
 - **首字母也能搜**：面板头部的放大镜打开一行搜索框，打 `cyy` 就能找到「C语言」——
   标题片段、文件夹名、英文、拼音首字母四路都认，命中的行仍留在它原来那一天的分组里；
   6763 个常用汉字的拼音表打包在代码里，不联网、不装依赖，输入不分大小写，收起搜索行就自动清空。
@@ -140,6 +144,12 @@ DeepSeek Harness 的会话列表一长，最新的一条和「还没看的那些
 一排色板点一下，面板与悬浮条同时换底色；文字、边框、悬停色都由这一个颜色推导，
 浅底自动配深字。最后一格是系统取色器，想要哪个色就哪个色；「默认」交还给自动反色。
 
+### 不透明度
+
+<img src="./assets/demo-opacity.png" alt="齿轮设置里的不透明度滑块，面板被拖到 62% 半透明，背后侧栏的文字透出来" width="330" />
+
+同一个齿轮里还有一条「不透明度」：30% 到 100%，拖低面板和悬浮条一起变淡，背后侧栏的会话行透得出来，
+不再是一块实心板。低于 100% 才给背景加毛玻璃，100% 时颜色和以前逐像素一致——不想动它的人看不出任何变化。
 ### 悬浮条
 
 <img src="./assets/demo-dock.png" alt="悬浮的会话条：标题行、近 N 天、会话列表、书签区和底部计数" width="400" />
@@ -182,6 +192,12 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 dsh plugin --profile web remove dsh-session-top-new
 dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 ```
+
+## v0.3.17 更新
+
+| 版本 | 内容 |
+| --- | --- |
+| 0.3.17 | 齿轮里多一个「不透明度」滑块（30%–100%）：拖低面板和悬浮条一起变半透明，背后的侧栏文字透得出来，低于 100% 才开毛玻璃，100% 和原来一模一样 |
 
 ## v0.3.16 更新
 
@@ -232,6 +248,7 @@ dsh plugin --profile web add github:momoqiqi-qwq/dsh-session-top-new-plus
 | 未读颜色 | 会话 id 哈希到 8 个色相；未读行的 2px 竖线与角标取同一个色 |
 | 未读记忆 | 共享的 `unreadSeen`：键是「会话 id + `updatedAt`」，看过只压住那一版，同一会话再跑完重新算未读；超过 400 条丢最旧的 |
 | 一键清空 | 同一份 `unreadSeen`，两个列表、两个角标都从它算；入口只有面板标题行 |
+| 不透明度 | `themeSource.setOpacity(30..100)`：写 `--dsb-opacity` / `--dsd-alpha`，背景走 `color-mix(..., transparent)`，低于 100% 才挂 `data-dsb-faded` 打开 `backdrop-filter`；回到 100 就删掉 `localStorage` 的 `dsh-session-top-new.opacity` |
 | 背景色 | `themeSource.setSurface(hex)`：一个 hex 推导整套变量（浅底换深字），写进 `localStorage` 的 `dsh-session-top-new.surface`，铃铛与悬浮条共用同一份 |
 | 面板尺寸 | `sizePref`：`localStorage` 的 `dsh-session-top-new.size`，`{ w, h }` 为 `0` 表示该轴仍由面板自选；`pointerdown` 在面板根上做 8px 边距命中测试，滚动条那 14px 让给列表 |
 | 面板跟随 | `MutationObserver` 回调只排一帧 `requestAnimationFrame` 去调 `positionPanel()`；`window` 捕获阶段监听 `scroll`（侧栏自己的滚动不冒泡）；`position()` 把铃铛 rect、侧栏 rect、视口尺寸拼成 key，与上次相同直接 `return` |
