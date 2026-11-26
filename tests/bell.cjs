@@ -166,7 +166,7 @@ const React = {
 let api;
 window.__ModuleLoader__ = { load(bundle) { api = bundle.factory(() => React); } };
 const sourceText = fs.readFileSync("lib/client.js", "utf8");
-const code = sourceText.replace("module.exports = { apply, inject, startsDockDrag };", "module.exports = { apply, inject, startsDockDrag, createBellSource, createThemeSource, mountSidebarBell, BellPanel, countNudges };");
+const code = sourceText.replace("module.exports = { apply, inject, startsDockDrag, dockEscapeSpots };", "module.exports = { apply, inject, startsDockDrag, dockEscapeSpots, createBellSource, createThemeSource, mountSidebarBell, BellPanel, countNudges };");
 vm.runInNewContext(code, {
 	window, document, localStorage, React, MutationObserver, ResizeObserver, console,
 	requestAnimationFrame: (fn) => { frames.set(++frameId, fn); return frameId; },
@@ -992,4 +992,19 @@ assert.match(sourceText, /cursor: grab;/, "and looks draggable");
 assert.match(sourceText, /dsd-root" \+ \(dragging \? " dsd-moving"/, "the root reports it is moving");
 assert.match(sourceText, /const panelFlipX = dragging \? flipRef\.current\.x/, "the panel keeps its side mid-drag");
 
-console.log("PASS: dock title row drags; shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; pinyin search; background job pill; dock badge stays a readout; inverted auto theme; custom background; opacity slider; gear picker; persisted mode");
+// A host surface can be painted over the dock. It then walks to the first spot
+// the browser says is free — same column first, then toward the sidebar, then
+// the window edges — and never leaves the travel box.
+const spots = api.dockEscapeSpots(600, 300, 800, 700);
+assert.equal(spots.length > 10, true, "the walk has somewhere to go");
+assert.equal(spots[0][0] === 600 && spots[0][1] === 240, true, "the first stop is one step up the same column");
+assert.equal(spots.every(([x, y]) => x >= 0 && x <= 800 && y >= 0 && y <= 700), true, "every stop stays inside the travel box");
+assert.equal(new Set(spots.map(([x, y]) => x + "," + y)).size, spots.length, "no stop is tried twice");
+assert.equal(spots.some(([x]) => x === 18), true, "walking left reaches the edge inset");
+const collapsed = api.dockEscapeSpots(-999, -999, 100, 100);
+assert.equal(collapsed.every(([x, y]) => x >= 0 && x <= 100 && y >= 0 && y <= 100) && collapsed.length < spots.length, true, "a dock outside the box collapses onto the box edges");
+assert.match(sourceText, /document\.elementFromPoint\(/, "coverage is asked of the browser, not guessed");
+assert.match(sourceText, /if \(!el \|\| dragRef\.current\) return; \/\/ never fight the pointer/, "a drag is never interrupted by the walk");
+assert.match(sourceText, /setInterval\(tick, 1500\)/, "and it looks again shortly after")
+
+console.log("PASS: dock escapes being covered; dock title row drags; shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; pinyin search; background job pill; dock badge stays a readout; inverted auto theme; custom background; opacity slider; gear picker; persisted mode");
