@@ -272,7 +272,11 @@ const gearEl = new Element("button"); gearEl.setAttribute("data-settings", "1");
 // mark-all-read control that draw() reaches for by attribute.
 const headClear = new Element("button"); headClear.setAttribute("data-clear-unread", "1");
 headClear.textContent = "全部已读";
-root.append(headClear, gearEl, settingsEl, scroll); document.body.append(root); refs[0].current = root;
+// The magnifier and its row are React's children in the real panel; the stub
+// does not build DOM, so the fixture supplies the pair the panel looks up.
+const panelSearchBtn = new Element("button"); panelSearchBtn.setAttribute("data-search", "1"); panelSearchBtn.setAttribute("aria-expanded", "false");
+const panelSearch = new Element("div"); panelSearch.className = "dsb-search"; panelSearch.setAttribute("aria-hidden", "true");
+root.append(headClear, gearEl, settingsEl, panelSearchBtn, panelSearch, scroll); document.body.append(root); refs[0].current = root;
 const disposePanel = layouts[0]();
 // Visibility is a class so the open/close transition can play; the node never leaves the document.
 assert.match(root.className, /dsb-in/);
@@ -645,6 +649,39 @@ assert.doesNotMatch(root.className, /dsb-resizing/);
 root.dispatchEvent({ type: "pointerdown", button: 0, clientX: 469, clientY: 699, detail: 2, preventDefault() {}, stopPropagation() {} });
 assert.equal(JSON.parse(localStorage.getItem("dsh-session-top-new.size")).w, 0, "the corner double-click forgets the box");
 root.getBoundingClientRect = realRect;
+// Search: the query narrows the day list in place, and pinyin initials mean
+// "cyy" finds a Chinese title without typing a single hanzi.
+dockState = { items: [
+	{ id: "clang", title: "C语言复习", folder: "课程", updatedAt: Date.now() + 3000 },
+	{ id: "plain", title: "Weekly notes", folder: "inbox", updatedAt: Date.now() }
+], current: null };
+listeners.forEach((fn) => fn());
+root.dispatchEvent({ type: "click", target: panelSearchBtn });
+assert.match(panelSearch.className, /dsb-show/, "the magnifier opens the search row");
+assert.equal(panelSearchBtn.attrs["aria-expanded"], "true");
+const searchInput = panelSearch.children[0];
+assert.equal(searchInput.attrs.type, "search", "a real search field, not a text box");
+assert.equal(scroll.querySelectorAll("[data-session]").length, 2, "the whole list is there before typing");
+searchInput.value = "cyy";
+searchInput.dispatchEvent({ type: "input" });
+assert.equal(scroll.querySelectorAll("[data-session]").length, 1, "initials narrow the list to one row");
+assert.equal(scroll.querySelector("[data-session]").dataset.session, "clang", "cyy finds C语言");
+searchInput.value = "zzz";
+searchInput.dispatchEvent({ type: "input" });
+assert.equal(scroll.textContent, "没有匹配 / No match", "an empty hit says so instead of looking broken");
+searchInput.value = "课程";
+searchInput.dispatchEvent({ type: "input" });
+assert.equal(scroll.querySelectorAll("[data-session]").length, 1, "the folder name is searched too");
+searchInput.value = "";
+searchInput.dispatchEvent({ type: "input" });
+assert.equal(scroll.querySelectorAll("[data-session]").length, 2, "clearing the query brings the list back");
+// Closing the row forgets the filter, so reopening never shows a short list.
+searchInput.value = "cyy";
+searchInput.dispatchEvent({ type: "input" });
+root.dispatchEvent({ type: "click", target: panelSearchBtn });
+assert.doesNotMatch(panelSearch.className, /dsb-show/, "a second press closes the row");
+assert.equal(searchInput.value, "", "closing forgets the query");
+assert.equal(scroll.querySelectorAll("[data-session]").length, 2);
 localStorage.removeItem("dsh-session-top-new.days");
 anchor.dispose(); disposePanel(); cleanups.forEach((fn) => fn());
 assert.equal(listeners.size, 0);
@@ -891,4 +928,4 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; background job pill; dock badge stays a readout; inverted auto theme; custom background; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; pinyin search; background job pill; dock badge stays a readout; inverted auto theme; custom background; gear picker; persisted mode");
