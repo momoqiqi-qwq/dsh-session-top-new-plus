@@ -234,12 +234,14 @@ assert.equal(layoutReads, reads, "anchor recovery performs no layout read");
 // and the gear row must drive the shared theme source.
 const themeCalls = [];
 const surfaceCalls = [];
+const opacityCalls = [];
 const themeStub = {
 	mode: "auto",
 	resolved: "light",
+	opacity: 100,
 	roots: [],
 	listeners: new Set(),
-	getSnapshot() { return { mode: this.mode, resolved: this.resolved, surface: this.surface || "" }; },
+	getSnapshot() { return { mode: this.mode, resolved: this.resolved, surface: this.surface || "", opacity: this.opacity }; },
 	subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
 	setMode(next) {
 		this.mode = next;
@@ -249,6 +251,11 @@ const themeStub = {
 	setSurface(next) {
 		this.surface = next;
 		surfaceCalls.push(next);
+		for (const fn of [...this.listeners]) fn(this.getSnapshot());
+	},
+	setOpacity(next) {
+		this.opacity = next;
+		opacityCalls.push(next);
 		for (const fn of [...this.listeners]) fn(this.getSnapshot());
 	},
 	apply(el) {
@@ -342,6 +349,20 @@ root.dispatchEvent({ type: "click", target: swatches[0] });
 assert.deepEqual(surfaceCalls, ["#1e2432", ""], "默认 hands the background back to the palette");
 assert.match(settingsEl.querySelector("[data-surface-now]").textContent, /默认/);
 surfaceCalls.length = 0;
+// Opacity: a percentage, not a colour. It is its own row so nobody confuses the
+// knob with a swatch, and 100 is what the panel already looked like.
+const alphaInput = settingsEl.querySelector("[data-opacity]");
+assert.equal(alphaInput.attrs.type, "range", "opacity is a slider");
+assert.equal(alphaInput.attrs.min, "30", "it stops short of vanishing");
+assert.equal(alphaInput.attrs.max, "100");
+assert.equal(settingsEl.querySelector("[data-opacity-now]").textContent, "100%", "full opacity by default");
+alphaInput.value = "60";
+alphaInput.dispatchEvent({ type: "input", target: alphaInput });
+assert.deepEqual(opacityCalls, [60], "dragging the slider writes through the theme source");
+assert.equal(settingsEl.querySelector("[data-opacity-now]").textContent, "60%", "the row echoes the percentage");
+const alphaSettled = settingsEl.querySelector("[data-opacity]");
+assert.equal(alphaSettled.value, "60", "and the knob stays where it was put");
+opacityCalls.length = 0;
 // Right-click a session: the bookmark path that needs nothing from the transcript
 // but the row's id and title, which is why it cannot fail the way the reply
 // button could (a message body whose markup we can no longer read).
@@ -923,9 +944,29 @@ assert.equal(fakeRoot.style["--dsb-surface"], "#1e2432", "a real colour paints a
 realTheme.setSurface("");
 assert.equal(realTheme.getSnapshot().surface, "");
 assert.equal(fakeRoot.style["--dsb-surface"], undefined, "默认 drops the override so the palette returns");
+// Opacity rides on the same paint path: 100 leaves the variables at 100 and the
+// faded flag off, so nothing is blurred for people who never touch the slider.
+assert.equal(realTheme.getSnapshot().opacity, 100, "no custom opacity by default");
+assert.equal(fakeRoot.style["--dsb-opacity"], "100");
+assert.equal(fakeRoot.dataset.dsbFaded, undefined, "a solid panel carries no blur flag");
+realTheme.setOpacity(62);
+assert.equal(localStorage.getItem("dsh-session-top-new.opacity"), "62", "the value is persisted");
+assert.equal(fakeRoot.style["--dsb-opacity"], "62", "the panel reads the same number");
+assert.equal(fakeRoot.style["--dsd-alpha"], "62", "and so does the dock");
+assert.equal(fakeRoot.dataset.dsbFaded, "62", "being see-through is what switches the blur on");
+realTheme.setOpacity(5);
+assert.equal(realTheme.getSnapshot().opacity, 30, "the floor keeps the panel usable");
+realTheme.setOpacity(120);
+assert.equal(realTheme.getSnapshot().opacity, 100, "and the ceiling is plain 100");
+assert.equal(localStorage.getItem("dsh-session-top-new.opacity"), null, "100 removes the key instead of storing it");
+assert.equal(fakeRoot.dataset.dsbFaded, undefined);
+localStorage.setItem("dsh-session-top-new.opacity", "45");
+window.dispatchEvent({ type: "storage", key: "dsh-session-top-new.opacity" });
+assert.equal(realTheme.getSnapshot().opacity, 45, "another tab's slider comes through storage");
+realTheme.setOpacity(100);
 localStorage.removeItem("dsh-session-top-new.surface");
 localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; pinyin search; background job pill; dock badge stays a readout; inverted auto theme; custom background; gear picker; persisted mode");
+console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; pinyin search; background job pill; dock badge stays a readout; inverted auto theme; custom background; opacity slider; gear picker; persisted mode");
