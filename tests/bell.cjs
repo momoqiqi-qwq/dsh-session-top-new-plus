@@ -166,7 +166,7 @@ const React = {
 let api;
 window.__ModuleLoader__ = { load(bundle) { api = bundle.factory(() => React); } };
 const sourceText = fs.readFileSync("lib/client.js", "utf8");
-const code = sourceText.replace("module.exports = { apply, inject };", "module.exports = { apply, inject, createBellSource, createThemeSource, mountSidebarBell, BellPanel, countNudges };");
+const code = sourceText.replace("module.exports = { apply, inject, startsDockDrag };", "module.exports = { apply, inject, startsDockDrag, createBellSource, createThemeSource, mountSidebarBell, BellPanel, countNudges };");
 vm.runInNewContext(code, {
 	window, document, localStorage, React, MutationObserver, ResizeObserver, console,
 	requestAnimationFrame: (fn) => { frames.set(++frameId, fn); return frameId; },
@@ -969,4 +969,27 @@ localStorage.removeItem("dsh-session-top-new.theme");
 detachTheme();
 realTheme.dispose();
 
-console.log("PASS: shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; pinyin search; background job pill; dock badge stays a readout; inverted auto theme; custom background; opacity slider; gear picker; persisted mode");
+// The dock drags from its title row too: the round button is easy to lose once
+// the panel is open and covers it. Controls living in that row keep their own
+// press, so typing "3" days or clicking the bell never starts a drag.
+const dragHead = new Element("div");
+dragHead.className = "dsd-head";
+const dragTitle = new Element("span");
+dragTitle.className = "dsd-title";
+const daysWrap = new Element("span");
+const daysInput = new Element("input");
+daysInput.setAttribute("type", "number");
+daysWrap.append(daysInput);
+const bellBtn = new Element("button");
+dragHead.append(dragTitle, daysWrap, bellBtn);
+assert.equal(api.startsDockDrag(dragTitle), true, "the bare title row starts a drag");
+assert.equal(api.startsDockDrag(daysWrap), true, "so does the gap around a control");
+assert.equal(api.startsDockDrag(daysInput), false, "a press in the days field stays a press");
+assert.equal(api.startsDockDrag(bellBtn), false, "the bell keeps its click");
+assert.equal(api.startsDockDrag(null), true, "a press with no target still drags");
+assert.match(sourceText, /className: "dsd-head", onPointerDown: onHeadDown/, "the title row is wired to the drag");
+assert.match(sourceText, /cursor: grab;/, "and looks draggable");
+assert.match(sourceText, /dsd-root" \+ \(dragging \? " dsd-moving"/, "the root reports it is moving");
+assert.match(sourceText, /const panelFlipX = dragging \? flipRef\.current\.x/, "the panel keeps its side mid-drag");
+
+console.log("PASS: dock title row drags; shared stable source; 500-mutation fast path and coalescing; no mutation layout; direct header seat; lazy persistent panel; groups and children; Escape/outside; flip; panel follows the bell; rail; collapsed startup/expand; direct badge updates; day window; empty state; navigation; late services; one subscription per service; complete plugin disposal; Ctrl+M new session (capture, IME, empty composer); badge colour; unread per version; draggable box; pinyin search; background job pill; dock badge stays a readout; inverted auto theme; custom background; opacity slider; gear picker; persisted mode");
